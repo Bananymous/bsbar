@@ -1,12 +1,16 @@
 #include "Common.h"
 
 #include <algorithm>
+#include <cassert>
 
 namespace bsbar
 {
 
 	void replace_all(std::string& str, std::string_view what, std::string_view to)
 	{
+		assert(!what.empty() && "replace_all: `what` is an empty string");
+		assert(to.find(what) == std::string_view::npos && "replace_all: to contains `what`");
+
 		std::size_t pos = 0;
 		while ((pos = str.find(what, pos)) != std::string::npos)
 			str.replace(pos, what.size(), to);

@@ -48,6 +48,7 @@ static std::vector<std::unique_ptr<bsbar::Block>> s_blocks;
 void print_blocks()
 {
 	static std::mutex print_mutex;
+
 	std::scoped_lock _(print_mutex);
 
 	static bool first_bar = true;
@@ -126,7 +127,6 @@ int main(int argc, char** argv, char** env)
 		return 1;
 
 	auto config = bsbar::parse_config(config_path);
-
 	s_blocks = std::move(config.blocks);
 
 	for (int sig = SIGRTMIN; sig <= SIGRTMAX; sig++)
@@ -135,7 +135,7 @@ int main(int argc, char** argv, char** env)
 	bsbar::ThreadPool tp(config.thread_pool_size);
 	std::thread t = std::thread(handle_clicks);
 
-	std::printf("{\"version\":1,\"click_events\":true}\n[");
+	std::printf("{\"version\":1,\"click_events\":true}\n[\n");
 
 	auto update_time = std::chrono::system_clock::now();
 	update_time = std::chrono::floor<std::chrono::seconds>(update_time);
