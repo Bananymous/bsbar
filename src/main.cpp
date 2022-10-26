@@ -140,7 +140,6 @@ int main(int argc, char** argv, char** env)
 	std::printf("{\"version\":1,\"click_events\":true}\n[\n");
 
 	auto update_time = std::chrono::system_clock::now();
-	update_time = std::chrono::floor<std::chrono::seconds>(update_time);
 
 	while (true)
 	{
@@ -153,7 +152,8 @@ int main(int argc, char** argv, char** env)
 
 		print_blocks();
 
-		update_time += std::chrono::seconds(1);
+		update_time = std::chrono::system_clock::now();
+		update_time = std::chrono::ceil<std::chrono::seconds>(update_time);
 		std::this_thread::sleep_until(update_time);
 	}
 
