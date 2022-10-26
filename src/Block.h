@@ -2,7 +2,7 @@
 
 #include "toml_include.h"
 
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 
 #include <atomic>
 #include <chrono>
