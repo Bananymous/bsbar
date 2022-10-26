@@ -39,8 +39,11 @@ namespace bsbar
 
 	protected:
 		virtual bool custom_update(time_point tp) = 0;
+
 		virtual bool add_custom_config(std::string_view key, toml::node& value) { return false; }
+		virtual bool add_custom_subconfig(std::string_view sub, std::string_view key, toml::node& value) { return false; }
 		void add_config(std::string_view key, toml::node& value);
+		void add_subconfig(std::string_view sub, std::string_view key, toml::node& value);
 
 	protected:
 		std::string									m_type;

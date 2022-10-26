@@ -89,7 +89,13 @@ namespace bsbar
 		block->m_type = *type;
 
 		for (auto& [key, node] : table)
-			block->add_config(key, node);
+		{
+			if (node.is_table())
+				for (auto& [sub_key, sub_node] : *node.as_table())
+					block->add_subconfig(key, sub_key, sub_node);
+			else
+				block->add_config(key, node);
+		}
 
 		if (!block->is_valid())
 			exit(1);
@@ -290,40 +296,56 @@ namespace bsbar
 			BSBAR_VERIFY_TYPE(value, number, key);
 			m_value.max = **value.as_floating_point();
 		}
-		else if (key == "click")
+		else if (key == "percision")
 		{
-			BSBAR_VERIFY_TYPE_CUSTOM_MESSAGE(value, table, "click must define a submodule");
-
-			for (auto& [click_key, click_value] : *value.as_table())
-			{
-				if (click_key == "command")
-				{
-					BSBAR_VERIFY_TYPE(click_value, string, click_key);
-					m_on_click.command = '"' + **click_value.as_string() + '"';
-				}
-				else if (click_key == "slider-show")
-				{
-					BSBAR_VERIFY_TYPE(click_value, string, click_key);
-					
-					std::string option = **click_value.as_string();
-					if (option == "on")
-						m_on_click.slider_options = SliderOptions::On;
-					else if (option == "off")
-						m_on_click.slider_options = SliderOptions::Off;
-					else if (option == "toggle")
-						m_on_click.slider_options = SliderOptions::Toggle;
-					else
-					{
-						std::cerr << "unrecognized value for key 'slider-show'. valid keys are \"on\", \"off\", \"toggle\"" << std::endl;
-						std::cerr << "  " << click_value.source() << std::endl;
-						exit(1);
-					}
-				}
-			}
+			BSBAR_VERIFY_TYPE(value, integer, key);
+			m_value.percision = **value.as_integer();
 		}
 		else
 		{
 			std::cerr << "Unknown key '" << key << "' for module '" << m_name << '\'' << std::endl;
+			std::cerr << "  " << value.source() << std::endl;
+			exit(1);
+		}
+	}
+
+	void Block::add_subconfig(std::string_view sub, std::string_view key, toml::node& value)
+	{
+		if (sub == "click")
+		{
+			if (key == "command")
+			{
+				BSBAR_VERIFY_TYPE(value, string, key);
+				m_on_click.command = '"' + **value.as_string() + '"';
+			}
+			else if (key == "slider-show")
+			{
+				BSBAR_VERIFY_TYPE(value, string, key);
+				
+				std::string_view option = *value.value<std::string_view>();
+				if (option == "on")
+					m_on_click.slider_options = SliderOptions::On;
+				else if (option == "off")
+					m_on_click.slider_options = SliderOptions::Off;
+				else if (option == "toggle")
+					m_on_click.slider_options = SliderOptions::Toggle;
+				else
+				{
+					std::cerr << "unrecognized value for key '" << key << "'. valid keys are \"on\", \"off\", \"toggle\"" << std::endl;
+					std::cerr << "  " << value.source() << std::endl;
+					exit(1);
+				}
+			}
+			else
+			{
+				std::cerr << "Unknown key '" << key << "' for module '" << m_name << '.' << sub << '\'' << std::endl;
+				std::cerr << "  " << value.source() << std::endl;
+				exit(1);	
+			}
+		}
+		else
+		{
+			std::cerr << "Unknown submodule '" << m_name << '.' << sub << std::endl;
 			std::cerr << "  " << value.source() << std::endl;
 			exit(1);
 		}
