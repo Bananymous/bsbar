@@ -30,8 +30,9 @@ namespace bsbar
 	{
 		std::string_view text;
 
-		std::string_view	value_sv;
-		double				value;
+		constexpr double nan = std::numeric_limits<double>::quiet_NaN();
+
+		double value = nan;
 
 		if (!m_text_command.empty())
 		{
@@ -65,24 +66,21 @@ namespace bsbar
 			if (!success)
 				return false;
 
-			value_sv = buffer;
-			value_sv = value_sv.substr(0, value_sv.find('\n'));
-			if (!string_to_value(value_sv, value))
+			if (!string_to_value(buffer, value))
 				return false;
 		}
 
 		std::scoped_lock _(m_mutex);
 
+		if (value != nan)
+			m_value.value = value;
+
 		m_text = m_format;
 
 		if (!text.empty())
 			replace_all(m_text, "%text%", text);
-
-		if (!value_sv.empty())
-		{
-			m_value.value = value;
-			replace_all(m_text, "%value%", value_sv);
-		}
+		else
+			replace_all(m_text, "%text", "<error>");
 
 		return true;
 	}

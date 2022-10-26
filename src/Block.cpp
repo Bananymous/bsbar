@@ -105,24 +105,32 @@ namespace bsbar
 		return true;
 	}
 
-	bool Block::update(time_point tp)
+	bool Block::update(time_point tp, bool force)
 	{
 		// thread safe
-		if (m_update_counter++ % m_interval)
+		if (!force && m_update_counter++ % m_interval)
 			return true;
 
 		// custom_update should do its own locking
 		if (!this->custom_update(tp))
 			return false;
 
+
 		std::scoped_lock _(m_mutex);
 
-		if (m_format.find("%ramp%") != std::string::npos)
+		if (m_text.find("%value%") != std::string::npos)
+		{
+			std::stringstream ss;
+			ss << std::fixed << std::setprecision(m_value.percision) << m_value.value;
+			replace_all(m_text, "%value%", ss.str());
+		}
+
+		if (m_text.find("%ramp%") != std::string::npos)
 		{
 			auto ramp_sv = get_ramp_string(m_value.value, m_value.min, m_value.max, m_value.ramp);
 			replace_all(m_text, "%ramp%", ramp_sv);
 		}
-
+		
 		return true;
 	}
 

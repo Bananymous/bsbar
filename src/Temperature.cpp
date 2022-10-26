@@ -39,7 +39,7 @@ namespace bsbar
 		m_value.value = value / 1000.0;
 
 		m_text = m_format;
-		replace_all(m_text, "%temperature%", line.substr(0, line.size() - 3));
+		replace_all(m_text, "%temperature%", "%value%");
 
 		return true;		
 	}

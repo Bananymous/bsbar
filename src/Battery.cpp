@@ -79,7 +79,7 @@ namespace bsbar
 		m_value.value = value;
 		m_text = m_format;
 
-		replace_all(m_text, "%percentage%",	capacity_sv);
+		replace_all(m_text, "%percentage%",	"%value%");
 		replace_all(m_text, "%status%",		status_sv);
 
 		if (status_sv == "Charging" && !m_ramp_charging.empty())

@@ -52,9 +52,10 @@ namespace bsbar
 
 		struct
 		{
-			double						min		=   0.0;
-			double						max		= 100.0;
-			double						value	=   0.0;
+			double						min			=   0.0;
+			double						max			= 100.0;
+			double						value		=   0.0;
+			int							percision	=   0;
 			std::vector<std::string>	ramp;
 		} m_value;
 
