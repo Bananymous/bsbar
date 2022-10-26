@@ -109,7 +109,11 @@ void handle_clicks()
 
 void signal_callback(int signal)
 {
-
+	// FIXME: thread pool?
+	auto tp = std::chrono::system_clock::now();
+	for (auto& block : s_blocks)
+		if (block->handles_signal(signal))
+			block->update(tp, true);
 }
 
 int main(int argc, char** argv, char** env)
@@ -121,12 +125,12 @@ int main(int argc, char** argv, char** env)
 	if (argc > 2)
 		return 1;
 
-	for (int sig = SIGRTMIN; sig <= SIGRTMAX; sig++)
-		std::signal(sig, signal_callback);
-
 	auto config = bsbar::parse_config(config_path);
 
 	s_blocks = std::move(config.blocks);
+
+	for (int sig = SIGRTMIN; sig <= SIGRTMAX; sig++)
+		std::signal(sig, signal_callback);
 
 	bsbar::ThreadPool tp(config.thread_pool_size);
 	std::thread t = std::thread(handle_clicks);

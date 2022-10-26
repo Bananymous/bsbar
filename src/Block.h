@@ -26,11 +26,13 @@ namespace bsbar
 		static std::unique_ptr<Block> create(std::string_view name, toml::table& table);
 		bool is_valid() const;
 
-		bool update(time_point tp);
+		bool update(time_point tp, bool force = false);
 		void print() const;
 
 		std::string_view get_name() const		{ return m_type; }
 		std::string_view get_instance() const	{ return m_name; }
+
+		bool handles_signal(int signal);
 
 		bool handle_click(nlohmann::json& json);
 		bool handle_slider_click(nlohmann::json& json);
@@ -49,6 +51,8 @@ namespace bsbar
 		std::atomic<int64_t>						m_update_counter	= 0;
 
 		std::unordered_map<std::string, Value>		m_i3bar;
+
+		std::unordered_set<int>						m_signals;
 
 		struct
 		{

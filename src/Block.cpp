@@ -8,11 +8,20 @@
 #include "Network.h"
 #include "Temperature.h"
 
+#include <csignal>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <unordered_set>
 
 #include <unistd.h>
+
+#define BSBAR_VERIFY_SIGNAL(node)																		\
+	if (auto sig = **node.as_integer(); sig < SIGRTMIN || sig > SIGRTMAX) {								\
+		std::cerr << "valid signal values are from " << SIGRTMIN << " to " << SIGRTMAX << std::endl;	\
+		std::cerr << "  " << node.source() << std::endl;												\
+		exit(1);																						\
+	}
 
 namespace bsbar
 {
@@ -153,7 +162,12 @@ namespace bsbar
 
 		std::printf("}");
 	}
-	
+
+	bool Block::handles_signal(int signal)
+	{
+		return m_signals.find(signal) != m_signals.end();
+	}
+
 	bool Block::handle_click(nlohmann::json& json)
 	{
 		switch (m_on_click.slider_options)
@@ -226,6 +240,29 @@ namespace bsbar
 		{
 			BSBAR_VERIFY_TYPE(value, integer, key);
 			m_interval = **value.as_integer();
+		}
+		else if (key == "signal")
+		{
+			if (value.is_integer())
+			{
+				BSBAR_VERIFY_SIGNAL(value);
+				m_signals.insert(**value.as_integer());
+			}
+			else if (value.is_array())
+			{
+				for (auto& signal : *value.as_array())
+				{
+					BSBAR_VERIFY_TYPE_CUSTOM_MESSAGE(signal, integer, "value for key 'signal' must be a interger or array of integers");
+					BSBAR_VERIFY_SIGNAL(signal);
+					m_signals.insert(**signal.as_integer());
+				}
+			}
+			else
+			{
+				std::cerr << "value for key 'signal' must be a interger or array of integers" << std::endl;
+				std::cerr << "  " << value.source() << std::endl;
+				exit(1);
+			}
 		}
 		else if (key == "format")
 		{
