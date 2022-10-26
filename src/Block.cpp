@@ -135,9 +135,7 @@ namespace bsbar
 
 		if (m_text.find("%value%") != std::string::npos)
 		{
-			std::stringstream ss;
-			ss << std::fixed << std::setprecision(m_value.percision) << m_value.value;
-			replace_all(m_text, "%value%", ss.str());
+			replace_all(m_text, "%value%", value_to_string(m_value.value, m_value.precision));
 		}
 
 		if (m_text.find("%ramp%") != std::string::npos)
@@ -296,10 +294,10 @@ namespace bsbar
 			BSBAR_VERIFY_TYPE(value, number, key);
 			m_value.max = **value.as_floating_point();
 		}
-		else if (key == "percision")
+		else if (key == "precision")
 		{
 			BSBAR_VERIFY_TYPE(value, integer, key);
-			m_value.percision = **value.as_integer();
+			m_value.precision = **value.as_integer();
 		}
 		else
 		{

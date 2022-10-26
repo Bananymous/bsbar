@@ -1,6 +1,8 @@
 #include "Common.h"
 
 #include <algorithm>
+#include <iomanip>
+#include <sstream>
 #include <cassert>
 
 namespace bsbar
@@ -21,6 +23,13 @@ namespace bsbar
 		double per_ramp = (max - min) / (double)ramp.size();
 		std::size_t index = std::clamp<std::size_t>(value / per_ramp, 0, ramp.size() - 1);
 		return ramp[index];
+	}
+
+	std::string value_to_string(double value, int precision)
+	{
+		std::stringstream ss;
+		ss << std::fixed << std::setprecision(precision) << value;
+		return ss.str();
 	}
 
 	std::vector<std::string_view> split(std::string_view sv, char c)

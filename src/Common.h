@@ -19,6 +19,8 @@ namespace bsbar
 
 	std::string_view get_ramp_string(double value, double min, double max, const std::vector<std::string>& ramp);
 
+	std::string value_to_string(double value, int percision);
+
 	std::vector<std::string_view> split(std::string_view sv, char c);
 	std::vector<std::string_view> split(std::string_view sv, const std::function<bool(char)>& comp);
 
