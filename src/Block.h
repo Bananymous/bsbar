@@ -5,10 +5,11 @@
 #include <nlohmann/json_fwd.hpp>
 
 #include <atomic>
-#include <chrono>
+#include <condition_variable>
 #include <mutex>
 #include <unordered_map>
 #include <unordered_set>
+#include <thread>
 
 namespace bsbar
 {
@@ -27,7 +28,6 @@ namespace bsbar
 		static std::unique_ptr<Block> create(std::string_view name, toml::table& table);
 		bool is_valid() const;
 
-		bool update(time_point tp, bool force = false);
 		void print() const;
 
 		std::string_view get_name() const		{ return m_type; }
@@ -46,6 +46,10 @@ namespace bsbar
 		void add_config(std::string_view key, toml::node& value);
 		void add_subconfig(std::string_view sub, std::string_view key, toml::node& value);
 
+	private:
+		void update_thread();
+		static void signal_dispatcher(int sig);
+
 	protected:
 		std::string									m_type;
 		std::string									m_name;
@@ -56,7 +60,7 @@ namespace bsbar
 
 		std::unordered_map<std::string, Value>		m_i3bar;
 
-		std::unordered_set<int>						m_signals;
+		std::string									m_text;
 
 		struct
 		{
@@ -79,8 +83,11 @@ namespace bsbar
 		} m_on_slider_click;
 		std::atomic<bool>							m_show_slider = false;
 
-		std::string									m_text;
-		mutable std::recursive_mutex				m_mutex;
+		std::atomic<bool>							m_force_update = false;
+		std::condition_variable						m_update_done_cv;	
+		std::condition_variable						m_update_cv;
+		std::thread 								m_thread;
+		mutable std::mutex							m_mutex;
 	};
 
 }

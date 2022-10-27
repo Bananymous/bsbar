@@ -23,8 +23,12 @@
 		exit(1);																						\
 	}
 
+void print_blocks();
+
 namespace bsbar
 {
+
+	static std::unordered_map<int, Block*> s_signals;
 
 	static std::optional<Block::Value> node_to_value(toml::node& node)
 	{
@@ -100,6 +104,8 @@ namespace bsbar
 		if (!block->is_valid())
 			exit(1);
 
+		block->m_thread = std::thread(&Block::update_thread, block.get());
+
 		return block;
 	}
 
@@ -120,31 +126,52 @@ namespace bsbar
 		return true;
 	}
 
-	bool Block::update(time_point tp, bool force)
+	void Block::update_thread()
 	{
-		// thread safe
-		if (!force && m_update_counter++ % m_interval)
-			return true;
+		using namespace std::chrono;
 
-		// custom_update should do its own locking
-		if (!this->custom_update(tp))
-			return false;
-
-
-		std::scoped_lock _(m_mutex);
-
-		if (m_text.find("%value%") != std::string::npos)
+		auto tp = system_clock::now();
+		while (true)
 		{
-			replace_all(m_text, "%value%", value_to_string(m_value.value, m_value.precision));
-		}
+			if (m_force_update)
+				tp = system_clock::now();
 
-		if (m_text.find("%ramp%") != std::string::npos)
-		{
-			auto ramp_sv = get_ramp_string(m_value.value, m_value.min, m_value.max, m_value.ramp);
-			replace_all(m_text, "%ramp%", ramp_sv);
+			if (custom_update(tp))
+			{
+				std::scoped_lock _(m_mutex);
+
+				if (m_text.find("%value%") != std::string::npos)
+					replace_all(m_text, "%value%", value_to_string(m_value.value, m_value.precision));
+
+				if (m_text.find("%ramp%") != std::string::npos)
+					replace_all(m_text, "%ramp%", get_ramp_string(m_value.value, m_value.min, m_value.max, m_value.ramp));
+			}
+
+			m_force_update = false;
+			m_update_done_cv.notify_all();
+
+			tp = ceil<seconds>(system_clock::now());
+			std::unique_lock lock(m_mutex);
+			m_update_cv.wait_until(lock, tp, [this]() { return m_force_update.load(); });
 		}
-		
-		return true;
+	}
+
+	void Block::signal_dispatcher(int sig)
+	{
+		static auto update_fn = [](Block* block)
+		{
+			block->m_force_update = true;
+			block->m_update_cv.notify_one();
+
+			std::unique_lock lock(block->m_mutex);
+			block->m_update_done_cv.wait(lock, [block]() { return !block->m_force_update; });
+			
+			print_blocks();
+		};
+
+		if (auto it = s_signals.find(sig); it != s_signals.end())
+			if (!it->second->m_force_update)
+				update_fn(it->second);
 	}
 
 	void Block::print() const
@@ -165,11 +192,6 @@ namespace bsbar
 		}
 
 		std::printf("}");
-	}
-
-	bool Block::handles_signal(int signal)
-	{
-		return m_signals.find(signal) != m_signals.end();
 	}
 
 	bool Block::handle_click(nlohmann::json& json)
@@ -250,7 +272,10 @@ namespace bsbar
 			if (value.is_integer())
 			{
 				BSBAR_VERIFY_SIGNAL(value);
-				m_signals.insert(**value.as_integer());
+
+				int sig = **value.as_integer();
+				std::signal(sig, &Block::signal_dispatcher);
+				s_signals[sig] = this;
 			}
 			else if (value.is_array())
 			{
@@ -258,7 +283,10 @@ namespace bsbar
 				{
 					BSBAR_VERIFY_TYPE_CUSTOM_MESSAGE(signal, integer, "value for key 'signal' must be a interger or array of integers");
 					BSBAR_VERIFY_SIGNAL(signal);
-					m_signals.insert(**signal.as_integer());
+
+					int sig = **value.as_integer();
+					std::signal(sig, &Block::signal_dispatcher);
+					s_signals[sig] = this;
 				}
 			}
 			else
