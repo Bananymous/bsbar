@@ -134,10 +134,7 @@ namespace bsbar
 		{
 			auto tp = system_clock::now();
 
-			bool update = (m_update_counter++ % m_interval) == 0;
-			update |= m_print;
-
-			if (update && custom_update(tp))
+			if (custom_update(tp))
 			{
 				std::scoped_lock _(m_mutex);
 
@@ -161,6 +158,13 @@ namespace bsbar
 	bool Block::handles_signal(int sig) const
 	{
 		return m_signals.find(sig) != m_signals.end();
+	}
+
+	void Block::update_clock_tick()
+	{
+		if (m_update_counter++ % m_interval)
+			return;
+		request_update(false);
 	}
 
 	void Block::request_update(bool print)
@@ -190,8 +194,11 @@ namespace bsbar
 		std::printf("}");
 	}
 
-	bool Block::handle_click(nlohmann::json& json)
+	bool Block::handle_click(const MouseInfo& mouse)
 	{
+		if (!handle_custom_click(mouse))
+			return false;
+
 		switch (m_on_click.slider_options)
 		{
 			case SliderOptions::On:
@@ -205,19 +212,39 @@ namespace bsbar
 				break;
 		}
 
-		if (m_on_click.command.empty())
-			return true;
-
-		if (fork() == 0)
+		if (!m_on_click.command.empty())
 		{
-			close(STDOUT_FILENO);
-			execl("/bin/sh", "sh", "-c", m_on_click.command.c_str(), NULL);
+			if (fork() == 0)
+			{
+				close(STDOUT_FILENO);
+				execl("/bin/sh", "sh", "-c", m_on_click.command.c_str(), NULL);
+			}
 		}
+
 		return true;
 	}
 
-	bool Block::handle_slider_click(nlohmann::json& json)
+	bool Block::handle_slider_click(const MouseInfo& mouse)
 	{
+		if (!handle_custom_slider_click(mouse))
+			return false;
+
+		return true;
+	}
+
+	bool Block::handle_scroll(const MouseInfo& mouse)
+	{
+		if (!handle_custom_scroll(mouse))
+			return false;
+
+		return true;
+	}
+
+	bool Block::handle_slider_scroll(const MouseInfo& mouse)
+	{
+		if (!handle_custom_slider_scroll(mouse))
+			return false;
+
 		return true;
 	}
 

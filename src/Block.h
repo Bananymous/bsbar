@@ -2,8 +2,6 @@
 
 #include "toml_include.h"
 
-#include <nlohmann/json_fwd.hpp>
-
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
@@ -24,6 +22,17 @@ namespace bsbar
 			std::string	value;
 		};
 
+		enum class MouseType {
+			Left, Right, Middle,
+			ScrollUp, ScrollDown,
+		};
+
+		struct MouseInfo {
+			MouseType	type;
+			int			pos[2];
+			int			size[2];
+		};
+
 	public:
 		static std::unique_ptr<Block> create(std::string_view name, toml::table& table);
 		bool is_valid() const;
@@ -33,15 +42,23 @@ namespace bsbar
 		std::string_view get_name() const		{ return m_type; }
 		std::string_view get_instance() const	{ return m_name; }
 
+		void update_clock_tick();
 		void request_update(bool print = false);
 
 		bool handles_signal(int signal) const;
 
-		bool handle_click(nlohmann::json& json);
-		bool handle_slider_click(nlohmann::json& json);
+		bool handle_click(const MouseInfo& mouse);
+		bool handle_scroll(const MouseInfo& mouse);
+		bool handle_slider_click(const MouseInfo& mouse);
+		bool handle_slider_scroll(const MouseInfo& mouse);
 
 	protected:
 		virtual bool custom_update(time_point tp) = 0;
+
+		virtual bool handle_custom_click(const MouseInfo& mouse) { return true; }
+		virtual bool handle_custom_scroll(const MouseInfo& mouse) { return true; }
+		virtual bool handle_custom_slider_click(const MouseInfo& mouse) { return true; }
+		virtual bool handle_custom_slider_scroll(const MouseInfo& mouse) { return true; }
 
 		virtual bool add_custom_config(std::string_view key, toml::node& value) { return false; }
 		virtual bool add_custom_subconfig(std::string_view sub, std::string_view key, toml::node& value) { return false; }

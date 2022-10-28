@@ -19,6 +19,41 @@ static std::string get_home_directory(char** env)
 	return "";
 }
 
+static bool parse_mouse_info(const nlohmann::json& json, bsbar::Block::MouseInfo& out)
+{
+	if (!json.contains("button") || !json["button"].is_number())
+		return false;
+
+	switch ((int)json["button"])
+	{
+		case 1: out.type = bsbar::Block::MouseType::Left;		break;
+		case 2: out.type = bsbar::Block::MouseType::Middle;		break;
+		case 3: out.type = bsbar::Block::MouseType::Right;		break;
+		case 4: out.type = bsbar::Block::MouseType::ScrollUp;	break;
+		case 5: out.type = bsbar::Block::MouseType::ScrollDown;	break;
+		default:
+			return false;
+	}
+
+	if (!json.contains("relative_x") || !json["relative_x"].is_number())
+		return false;
+	out.pos[0] = json["relative_x"];
+
+	if (!json.contains("relative_y") || !json["relative_y"].is_number())
+		return false;
+	out.pos[1] = json["relative_y"];
+
+	if (!json.contains("width") || !json["width"].is_number())
+		return false;
+	out.size[0] = json["width"];
+
+	if (!json.contains("height") || !json["height"].is_number())
+		return false;
+	out.size[1] = json["height"];
+
+	return true;
+}
+
 static std::vector<std::unique_ptr<bsbar::Block>> s_blocks;
 
 void print_blocks()
@@ -73,8 +108,13 @@ static void handle_clicks()
 		if (!json["name"].is_string() || !json["instance"].is_string())
 			continue;
 
-		std::string name		= json["name"].get<std::string>();
-		std::string instance	= json["instance"].get<std::string>();
+		std::string name		= json["name"];
+		std::string instance	= json["instance"];
+
+		bsbar::Block::MouseInfo mouse;
+		if (!parse_mouse_info(json, mouse))
+			exit(2);
+
 		bool slider = false;
 
 		if (instance.ends_with("-slider"))
@@ -85,8 +125,23 @@ static void handle_clicks()
 
 		bool res = false;
 		for (auto& block : s_blocks)
+		{
 			if (block->get_name() == name && block->get_instance() == instance)
-				res |= slider ? block->handle_slider_click(json) : block->handle_click(json);
+			{
+				switch (mouse.type)
+				{
+					case bsbar::Block::MouseType::Left:
+					case bsbar::Block::MouseType::Middle:
+					case bsbar::Block::MouseType::Right:
+						res |= slider ? block->handle_slider_click(mouse) : block->handle_click(mouse);
+						break;
+					case bsbar::Block::MouseType::ScrollDown:
+					case bsbar::Block::MouseType::ScrollUp:
+						res |= slider ? block->handle_slider_scroll(mouse) : block->handle_scroll(mouse);
+						break;
+				}
+			}
+		}
 		if (res) print_blocks();
 	}
 }
@@ -116,7 +171,7 @@ int main(int argc, char** argv, char** env)
 		using namespace std::chrono;
 
 		for (auto& block : s_blocks)
-			block->request_update();
+			block->update_clock_tick();
 
 		// FIXME: hacky way to wait for updates :D
 		std::this_thread::sleep_for(milliseconds(10));
