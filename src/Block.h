@@ -33,7 +33,9 @@ namespace bsbar
 		std::string_view get_name() const		{ return m_type; }
 		std::string_view get_instance() const	{ return m_name; }
 
-		bool handles_signal(int signal);
+		void request_update(bool print = false);
+
+		bool handles_signal(int signal) const;
 
 		bool handle_click(nlohmann::json& json);
 		bool handle_slider_click(nlohmann::json& json);
@@ -48,7 +50,6 @@ namespace bsbar
 
 	private:
 		void update_thread();
-		static void signal_dispatcher(int sig);
 
 	protected:
 		std::string									m_type;
@@ -61,6 +62,8 @@ namespace bsbar
 		std::unordered_map<std::string, Value>		m_i3bar;
 
 		std::string									m_text;
+
+		std::unordered_set<int>						m_signals;
 
 		struct
 		{
@@ -83,7 +86,8 @@ namespace bsbar
 		} m_on_slider_click;
 		std::atomic<bool>							m_show_slider = false;
 
-		std::atomic<bool>							m_force_update = false;
+		std::atomic<bool>							m_print		= false;
+		std::atomic<bool>							m_update	= false;
 		std::condition_variable						m_update_cv;
 		std::thread 								m_thread;
 		mutable std::mutex							m_mutex;

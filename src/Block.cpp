@@ -17,7 +17,7 @@
 #include <unistd.h>
 
 #define BSBAR_VERIFY_SIGNAL(node)																		\
-	if (auto sig = **node.as_integer(); sig < SIGRTMIN || sig > SIGRTMAX) {								\
+	if (auto sig = **node.as_integer(); sig < 0 || sig > SIGRTMAX - SIGRTMIN) {							\
 		std::cerr << "valid signal values are from " << SIGRTMIN << " to " << SIGRTMAX << std::endl;	\
 		std::cerr << "  " << node.source() << std::endl;												\
 		exit(1);																						\
@@ -129,14 +129,15 @@ namespace bsbar
 	void Block::update_thread()
 	{
 		using namespace std::chrono;
-
-		auto tp = system_clock::now();
+		
 		while (true)
 		{
-			if (m_force_update)
-				tp = system_clock::now();
+			auto tp = system_clock::now();
 
-			if (custom_update(tp))
+			bool update = (m_update_counter++ % m_interval) == 0;
+			update |= m_print;
+
+			if (update && custom_update(tp))
 			{
 				std::scoped_lock _(m_mutex);
 
@@ -147,23 +148,26 @@ namespace bsbar
 					replace_all(m_text, "%ramp%", get_ramp_string(m_value.value, m_value.min, m_value.max, m_value.ramp));
 			}
 
-			if (m_force_update)
+			if (m_print)
 				print_blocks();
-			m_force_update = false;
+			m_print		= false;
+			m_update	= false;
 
-			tp = ceil<seconds>(system_clock::now());
 			std::unique_lock lock(m_mutex);
-			m_update_cv.wait_until(lock, tp, [this]() { return m_force_update.load(); });
+			m_update_cv.wait(lock, [this]() { return m_update.load(); });
 		}
 	}
 
-	void Block::signal_dispatcher(int sig)
+	bool Block::handles_signal(int sig) const
 	{
-		if (auto it = s_signals.find(sig); it != s_signals.end())
-		{
-			it->second->m_force_update = true;
-			it->second->m_update_cv.notify_all();
-		}
+		return m_signals.find(sig) != m_signals.end();
+	}
+
+	void Block::request_update(bool print)
+	{
+		m_update = true;
+		m_print = m_print | print;
+		m_update_cv.notify_all();
 	}
 
 	void Block::print() const
@@ -257,6 +261,17 @@ namespace bsbar
 		if (key == "interval")
 		{
 			BSBAR_VERIFY_TYPE(value, integer, key);
+			int64_t interval = **value.as_integer();
+			if (interval == -1)
+				m_interval = INT64_MAX;
+			else if (interval > 0)
+				m_interval = interval;
+			else
+			{
+				std::cerr << "Value for key 'interval' must be positive integer or -1 to disable automatic updates" << std::endl;
+				std::cerr << "  " << value.source() << std::endl;
+				exit(1);
+			}
 			m_interval = **value.as_integer();
 		}
 		else if (key == "signal")
@@ -264,10 +279,8 @@ namespace bsbar
 			if (value.is_integer())
 			{
 				BSBAR_VERIFY_SIGNAL(value);
-
-				int sig = **value.as_integer();
-				std::signal(sig, &Block::signal_dispatcher);
-				s_signals[sig] = this;
+				int sig = **value.as_integer() + SIGRTMIN;
+				m_signals.insert(sig);
 			}
 			else if (value.is_array())
 			{
@@ -275,10 +288,8 @@ namespace bsbar
 				{
 					BSBAR_VERIFY_TYPE_CUSTOM_MESSAGE(signal, integer, "value for key 'signal' must be a interger or array of integers");
 					BSBAR_VERIFY_SIGNAL(signal);
-
-					int sig = **value.as_integer();
-					std::signal(sig, &Block::signal_dispatcher);
-					s_signals[sig] = this;
+					int sig = **value.as_integer() + SIGRTMIN;
+					m_signals.insert(sig);
 				}
 			}
 			else

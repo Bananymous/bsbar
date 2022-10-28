@@ -2,8 +2,9 @@
 
 #include <nlohmann/json.hpp>
 
-#include <iostream>
+#include <csignal>
 #include <fstream>
+#include <iostream>
 #include <thread>
 
 static std::string get_home_directory(char** env)
@@ -44,6 +45,13 @@ void print_blocks()
 	std::fflush(stdout);
 
 	first_bar = false;
+}
+
+static void signal_handler(int signal)
+{
+	for (auto& block : s_blocks)
+		if (block->handles_signal(signal))
+			block->request_update(true);
 }
 
 static void handle_clicks()
@@ -95,6 +103,10 @@ int main(int argc, char** argv, char** env)
 	auto config = bsbar::parse_config(config_path);
 	s_blocks = std::move(config.blocks);
 
+	// Assing signal handler for all signals between SIGRTMIN and SIGRTMAX
+	for (int sig = SIGRTMIN; sig <= SIGRTMAX; sig++)
+		std::signal(sig, signal_handler);
+
 	std::thread t = std::thread(handle_clicks);
 
 	std::printf("{\"version\":1,\"click_events\":true}\n[\n");
@@ -102,11 +114,16 @@ int main(int argc, char** argv, char** env)
 	while (true)
 	{
 		using namespace std::chrono;
-		
+
+		for (auto& block : s_blocks)
+			block->request_update();
+
+		// FIXME: hacky way to wait for updates :D
+		std::this_thread::sleep_for(milliseconds(10));
 		print_blocks();
 
 		auto tp = system_clock::now();
-		tp = ceil<seconds>(tp) + milliseconds(10);
+		tp = ceil<seconds>(tp);
 		std::this_thread::sleep_until(tp);
 	}
 	
