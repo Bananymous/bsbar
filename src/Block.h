@@ -84,7 +84,6 @@ namespace bsbar
 		std::atomic<bool>							m_show_slider = false;
 
 		std::atomic<bool>							m_force_update = false;
-		std::condition_variable						m_update_done_cv;	
 		std::condition_variable						m_update_cv;
 		std::thread 								m_thread;
 		mutable std::mutex							m_mutex;

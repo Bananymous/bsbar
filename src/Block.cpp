@@ -147,8 +147,9 @@ namespace bsbar
 					replace_all(m_text, "%ramp%", get_ramp_string(m_value.value, m_value.min, m_value.max, m_value.ramp));
 			}
 
+			if (m_force_update)
+				print_blocks();
 			m_force_update = false;
-			m_update_done_cv.notify_all();
 
 			tp = ceil<seconds>(system_clock::now());
 			std::unique_lock lock(m_mutex);
@@ -158,20 +159,11 @@ namespace bsbar
 
 	void Block::signal_dispatcher(int sig)
 	{
-		static auto update_fn = [](Block* block)
-		{
-			block->m_force_update = true;
-			block->m_update_cv.notify_one();
-
-			std::unique_lock lock(block->m_mutex);
-			block->m_update_done_cv.wait(lock, [block]() { return !block->m_force_update; });
-			
-			print_blocks();
-		};
-
 		if (auto it = s_signals.find(sig); it != s_signals.end())
-			if (!it->second->m_force_update)
-				update_fn(it->second);
+		{
+			it->second->m_force_update = true;
+			it->second->m_update_cv.notify_all();
+		}
 	}
 
 	void Block::print() const
