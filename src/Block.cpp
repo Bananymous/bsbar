@@ -6,6 +6,7 @@
 #include "Custom.h"
 #include "DateTime.h"
 #include "Network.h"
+#include "PulseAudio.h"
 #include "Temperature.h"
 
 #include <csignal>
@@ -71,14 +72,16 @@ namespace bsbar
 
 		std::unique_ptr<Block> block = nullptr;
 
-		if (*type == "internal/datetime")
-			block = std::make_unique<DateTimeBlock>();
-		else if (*type == "internal/battery")
+		if (*type == "internal/battery")
 			block = std::make_unique<BatteryBlock>();
-		else if (*type == "internal/temperature")
-			block = std::make_unique<TemperatureBlock>();
+		else if (*type == "internal/datetime")
+			block = std::make_unique<DateTimeBlock>();
 		else if (*type == "internal/network")
 			block = std::make_unique<NetworkBlock>();
+		else if (*type == "internal/pulseaudio")
+			block = std::make_unique<PulseAudioBlock>();
+		else if (*type == "internal/temperature")
+			block = std::make_unique<TemperatureBlock>();
 		else if (*type == "custom")
 			block = std::make_unique<CustomBlock>();	
 

@@ -123,7 +123,6 @@ static void handle_clicks()
 			slider = true;
 		}
 
-		bool res = false;
 		for (auto& block : s_blocks)
 		{
 			if (block->get_name() == name && block->get_instance() == instance)
@@ -133,16 +132,17 @@ static void handle_clicks()
 					case bsbar::Block::MouseType::Left:
 					case bsbar::Block::MouseType::Middle:
 					case bsbar::Block::MouseType::Right:
-						res |= slider ? block->handle_slider_click(mouse) : block->handle_click(mouse);
+						slider ? block->handle_slider_click(mouse) : block->handle_click(mouse);
 						break;
 					case bsbar::Block::MouseType::ScrollDown:
 					case bsbar::Block::MouseType::ScrollUp:
-						res |= slider ? block->handle_slider_scroll(mouse) : block->handle_scroll(mouse);
+						slider ? block->handle_slider_scroll(mouse) : block->handle_scroll(mouse);
 						break;
 				}
+				block->request_update(true);
+				break;
 			}
 		}
-		if (res) print_blocks();
 	}
 }
 

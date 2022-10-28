@@ -16,12 +16,17 @@ project "bsbar"
 		"src/DateTime.cpp",
         "src/main.cpp",
 		"src/Network.cpp",
+		"src/PulseAudio.cpp",
 		"src/Temperature.cpp",
     }
 
     includedirs {
 		"src",
 		"vendor",
+	}
+	
+	links {
+		"pulse"
 	}
 
     filter "configurations:Debug"  
