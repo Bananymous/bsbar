@@ -113,7 +113,7 @@ static void handle_clicks()
 
 		bsbar::Block::MouseInfo mouse;
 		if (!parse_mouse_info(json, mouse))
-			exit(2);
+			continue;
 
 		bool slider = false;
 
