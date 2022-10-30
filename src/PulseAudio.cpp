@@ -6,6 +6,7 @@
 
 namespace bsbar
 {
+	using namespace std::chrono_literals;
 
 	struct PaData
 	{
@@ -31,10 +32,11 @@ namespace bsbar
 		std::mutex				mutex;
 		std::condition_variable	cv;
 
-		void wait_update(std::unique_lock<decltype(mutex)>& lock)
+		template<typename Rep, typename Period>
+		void wait_update_for(std::unique_lock<std::mutex>& lock, const std::chrono::duration<Rep, Period>& duration)
 		{
 			updated = false;
-			cv.wait(lock, [this]() { return updated; });
+			cv.wait_for(lock, duration, [this]() { return updated; });
 		}
 
 		void update()
@@ -107,7 +109,6 @@ namespace bsbar
 		switch (facility)
 		{
 			case PA_SUBSCRIPTION_EVENT_SINK:
-			case PA_SUBSCRIPTION_EVENT_SINK_INPUT:
 				op = pa_context_get_sink_info_by_index(c, idx, sink_info_callback, NULL);
 				break;
 
@@ -196,13 +197,6 @@ namespace bsbar
 
 
 
-
-
-
-
-
-
-
 	bool PulseAudioBlock::custom_update(time_point tp)
 	{
 		std::scoped_lock _(s_volume_info.mutex, m_mutex);
@@ -236,34 +230,40 @@ namespace bsbar
 		std::unique_lock lock(s_volume_info.mutex);
 
 		pa_context_set_sink_mute_by_index(s_pa_data.context, s_volume_info.index, !s_volume_info.muted, NULL, NULL);
-		s_volume_info.wait_update(lock);
+		s_volume_info.wait_update_for(lock, 100ms);
 
 		return true;
 	}
 
 	bool PulseAudioBlock::handle_custom_scroll(const MouseInfo& mouse)
 	{
-		std::unique_lock lock(s_volume_info.mutex);
-
-		if (s_volume_info.sink.empty())
-			return false;
+		pa_cvolume temp;
+		{
+			std::scoped_lock _(s_volume_info.mutex);
+			temp = s_volume_info.volume;
+		}
 
 		auto diff = percentage_to_pa_volume_t(5.0);
 
 		switch (mouse.type)
 		{
 			case MouseType::ScrollUp:
-				if (!pa_cvolume_inc(&s_volume_info.volume, diff))
+				if (!pa_cvolume_inc(&temp, diff))
 					return false;
 				break;
 			case MouseType::ScrollDown:
-				if (!pa_cvolume_dec(&s_volume_info.volume, diff))
+				if (!pa_cvolume_dec(&temp, diff))
 					return false;
 				break;
 		}
 
-		pa_context_set_sink_volume_by_index(s_pa_data.context, s_volume_info.index, &s_volume_info.volume, NULL, NULL);
-		s_volume_info.wait_update(lock);
+		std::unique_lock lock(s_volume_info.mutex);
+
+		if (!pa_cvolume_equal(&temp, &s_volume_info.volume))
+		{
+			pa_context_set_sink_volume_by_index(s_pa_data.context, s_volume_info.index, &temp, NULL, NULL);
+			s_volume_info.wait_update_for(lock, 100ms);
+		}
 
 		return true;
 	}
