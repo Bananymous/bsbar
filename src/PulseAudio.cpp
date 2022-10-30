@@ -1,5 +1,7 @@
 #include "PulseAudio.h"
 
+#include "Common.h"
+
 #include <pulse/pulseaudio.h>
 
 #include <iostream>
@@ -209,17 +211,35 @@ namespace bsbar
 			s_thread = std::thread(&pa_run);
 		}
 
-		m_text = m_format;
+		if (m_format_muted && s_volume_info.muted)
+			m_text = *m_format_muted;
+		else
+			m_text = m_format;
+
+		if (m_color_muted && s_volume_info.muted)
+			m_i3bar["color"] = { .is_string = true, .value = *m_color_muted };
+		else
+			m_i3bar.erase("color");
+	
 		m_value.value = pa_cvolume_to_percentage(&s_volume_info.volume);
 
-		if (s_volume_info.muted)
-			m_text = "mute";
-		
 		return true;
 	}
 
 	bool PulseAudioBlock::add_custom_config(std::string_view key, toml::node& value)
 	{
+		if (key == "format-muted")
+		{
+			BSBAR_VERIFY_TYPE(value, string, key);
+			m_format_muted = **value.as_string();
+			return true;
+		}
+		else if (key == "color-muted")
+		{
+			BSBAR_VERIFY_TYPE(value, string, key);
+			m_color_muted = **value.as_string();
+			return true;
+		}
 
 		return false;
 	}

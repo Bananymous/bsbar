@@ -146,6 +146,9 @@ namespace bsbar
 
 				if (m_text.find("%ramp%") != std::string::npos)
 					replace_all(m_text, "%ramp%", get_ramp_string(m_value.value, m_value.min, m_value.max, m_value.ramp));
+
+				if (m_color && m_i3bar.find("color") == m_i3bar.end())
+					m_i3bar["color"] = { .is_string = true, .value = *m_color };
 			}
 
 			if (m_print)
@@ -268,18 +271,6 @@ namespace bsbar
 			"separator_block_width",
 			"markup",
 		};
-		if (supported_i3bar.find(key) != supported_i3bar.end())
-		{
-			auto result = node_to_value(value);
-			if (!result)
-			{
-				std::cerr << "Unsupported value type for key '" << key << '\'' << std::endl;
-				std::cerr << "  " << value.source() << std::endl;
-				exit(1);
-			}
-			m_i3bar[std::string(key)] = *result;
-			return;
-		}
 
 		if (key == "type")
 			return;
@@ -303,6 +294,11 @@ namespace bsbar
 				exit(1);
 			}
 			m_interval = **value.as_integer();
+		}
+		else if (key == "color")
+		{
+			BSBAR_VERIFY_TYPE(value, string, key);
+			m_color = **value.as_string();
 		}
 		else if (key == "signal")
 		{
@@ -359,6 +355,17 @@ namespace bsbar
 		{
 			BSBAR_VERIFY_TYPE(value, integer, key);
 			m_value.precision = **value.as_integer();
+		}
+		else if (supported_i3bar.find(key) != supported_i3bar.end())
+		{
+			auto result = node_to_value(value);
+			if (!result)
+			{
+				std::cerr << "Unsupported value type for key '" << key << '\'' << std::endl;
+				std::cerr << "  " << value.source() << std::endl;
+				exit(1);
+			}
+			m_i3bar[std::string(key)] = *result;
 		}
 		else
 		{

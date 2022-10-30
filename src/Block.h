@@ -73,6 +73,8 @@ namespace bsbar
 		std::string									m_name;
 		std::string									m_format;
 
+		std::optional<std::string>					m_color;
+
 		std::atomic<int64_t>						m_interval			= 1;
 		std::atomic<int64_t>						m_update_counter	= 0;
 
