@@ -9,7 +9,7 @@ namespace bsbar
 
 	struct PaData
 	{
-		std::atomic<bool>	initialized		= false;
+		bool				initialized		= false;
 
 		pa_mainloop*		mainloop		= NULL;
 		pa_mainloop_api*	mainloop_api	= NULL;
@@ -20,13 +20,43 @@ namespace bsbar
 
 	struct VolumeInfo
 	{
-		double		volume	= 0.0;
+		pa_cvolume	volume	= {};
 		bool		muted	= false;
+		uint32_t	index	= 0;
 		std::string	sink;
+
+
+
+		bool					updated	= false;
+		std::mutex				mutex;
+		std::condition_variable	cv;
+
+		void wait_update(std::unique_lock<decltype(mutex)>& lock)
+		{
+			updated = false;
+			cv.wait(lock, [this]() { return updated; });
+		}
+
+		void update()
+		{
+			updated = true;
+			cv.notify_all();
+		}
 	};
 	static VolumeInfo s_volume_info;
 
-	static std::mutex s_mutex;
+
+	static double pa_cvolume_to_percentage(const pa_cvolume* volume)
+	{
+		if (!pa_cvolume_valid(volume))
+			return 0.0;
+		return (double)pa_cvolume_avg(volume) / (double)PA_VOLUME_NORM * 100.0;
+	}
+
+	static pa_volume_t percentage_to_pa_volume_t(double percentage)
+	{
+		return (pa_volume_t)(percentage * (double)PA_VOLUME_NORM / 100.0);
+	}
 
 
 	static int pa_run()
@@ -48,18 +78,22 @@ namespace bsbar
 	{
 		if (!info)
 			return;
-		double volume = (double)pa_cvolume_avg(&(info->volume)) / (double)PA_VOLUME_NORM;
 
-		std::scoped_lock _(s_mutex);
-		s_volume_info.volume = volume * 100.0;
-		s_volume_info.muted = info->mute;
+
+		std::scoped_lock _(s_volume_info.mutex);
+
+		s_volume_info.volume	= info->volume;
+		s_volume_info.muted		= info->mute;
+		s_volume_info.index		= info->index;
+
+		s_volume_info.update();
 	}
 
-	static void server_info_callback(pa_context *c, const pa_server_info *i, void*)
+	static void server_info_callback(pa_context* c, const pa_server_info *i, void*)
 	{
 		pa_context_get_sink_info_by_name(c, i->default_sink_name, sink_info_callback, NULL);
 
-		std::scoped_lock _(s_mutex);
+		std::scoped_lock _(s_volume_info.mutex);
 		s_volume_info.sink = i->default_sink_name;
 	}
 
@@ -73,6 +107,7 @@ namespace bsbar
 		switch (facility)
 		{
 			case PA_SUBSCRIPTION_EVENT_SINK:
+			case PA_SUBSCRIPTION_EVENT_SINK_INPUT:
 				op = pa_context_get_sink_info_by_index(c, idx, sink_info_callback, NULL);
 				break;
 
@@ -170,19 +205,22 @@ namespace bsbar
 
 	bool PulseAudioBlock::custom_update(time_point tp)
 	{
-		std::scoped_lock _1(s_mutex);
+		std::scoped_lock _(s_volume_info.mutex, m_mutex);
 		if (!s_pa_data.initialized)
 		{
 			if (!pa_initialize())
 				exit(1);
+			atexit(pa_cleanup);
 			s_pa_data.initialized = true;
 			s_thread = std::thread(&pa_run);
 		}
 
-		std::scoped_lock _2(m_mutex);
 		m_text = m_format;
-		m_value.value = s_volume_info.volume;
+		m_value.value = pa_cvolume_to_percentage(&s_volume_info.volume);
 
+		if (s_volume_info.muted)
+			m_text = "mute";
+		
 		return true;
 	}
 
@@ -192,17 +230,40 @@ namespace bsbar
 		return false;
 	}
 
+
+	bool PulseAudioBlock::handle_custom_click(const MouseInfo& mouse)
+	{
+		std::unique_lock lock(s_volume_info.mutex);
+
+		pa_context_set_sink_mute_by_index(s_pa_data.context, s_volume_info.index, !s_volume_info.muted, NULL, NULL);
+		s_volume_info.wait_update(lock);
+
+		return true;
+	}
+
 	bool PulseAudioBlock::handle_custom_scroll(const MouseInfo& mouse)
 	{
+		std::unique_lock lock(s_volume_info.mutex);
+
+		if (s_volume_info.sink.empty())
+			return false;
+
+		auto diff = percentage_to_pa_volume_t(5.0);
+
 		switch (mouse.type)
 		{
 			case MouseType::ScrollUp:
-				system("pactl set-sink-volume @DEFAULT_SINK@ +5%");
+				if (!pa_cvolume_inc(&s_volume_info.volume, diff))
+					return false;
 				break;
 			case MouseType::ScrollDown:
-				system("pactl set-sink-volume @DEFAULT_SINK@ -5%");
+				if (!pa_cvolume_dec(&s_volume_info.volume, diff))
+					return false;
 				break;
 		}
+
+		pa_context_set_sink_volume_by_index(s_pa_data.context, s_volume_info.index, &s_volume_info.volume, NULL, NULL);
+		s_volume_info.wait_update(lock);
 
 		return true;
 	}
