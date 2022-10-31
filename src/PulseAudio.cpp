@@ -10,6 +10,7 @@ namespace bsbar
 {
 	using namespace std::chrono_literals;
 
+	// Does not need mutex since it's readonly after initialization?
 	struct ServerInfo
 	{
 		bool				initialized		= false;
@@ -21,7 +22,7 @@ namespace bsbar
 	static ServerInfo	s_server_info;
 	static std::thread	s_thread;
 
-	struct SinkInfo
+	struct VolumeInfo
 	{
 		pa_cvolume				volume	= {};
 		bool					muted	= false;
@@ -44,7 +45,8 @@ namespace bsbar
 			cv.notify_all();
 		}
 	};
-	static SinkInfo s_sink_info;
+	static VolumeInfo s_sink_info;
+	static VolumeInfo s_source_info;
 
 	template<typename T>
 	static T pa_cvolume_to_percentage(const pa_cvolume* volume)
@@ -90,9 +92,24 @@ namespace bsbar
 		s_sink_info.update();
 	}
 
+	static void source_info_callback(pa_context* context, const pa_source_info* info, int eol, void*)
+	{
+		if (!info)
+			return;
+
+		std::scoped_lock _(s_source_info.mutex);
+
+		s_source_info.volume	= info->volume;
+		s_source_info.muted		= info->mute;
+		s_source_info.index		= info->index;
+
+		s_source_info.update();
+	}
+
 	static void server_info_callback(pa_context* context, const pa_server_info* info, void*)
 	{
 		pa_context_get_sink_info_by_name(context, info->default_sink_name, sink_info_callback, NULL);
+		pa_context_get_source_info_by_name(context, info->default_source_name, source_info_callback, NULL);
 	}
 
 	static void subscribe_callback(pa_context* context, pa_subscription_event_type_t type, uint32_t index, void*)
@@ -105,6 +122,10 @@ namespace bsbar
 		{
 			case PA_SUBSCRIPTION_EVENT_SINK:
 				op = pa_context_get_sink_info_by_index(context, index, sink_info_callback, NULL);
+				break;
+
+			case PA_SUBSCRIPTION_EVENT_SOURCE:
+				op = pa_context_get_source_info_by_index(context, index, source_info_callback, NULL);
 				break;
 
 			case PA_SUBSCRIPTION_EVENT_SERVER:
@@ -204,6 +225,9 @@ namespace bsbar
 			s_server_info.initialized = true;
 			s_thread = std::thread(&pa_run);
 		}
+
+		m_max_volume	= percentage_to_pa_volume_t<uint32_t>(100);
+		m_volume_step	= percentage_to_pa_volume_t<uint32_t>(5);
 	}
 
 	bool PulseAudioBlock::add_custom_config(std::string_view key, toml::node& value)
@@ -224,18 +248,24 @@ namespace bsbar
 		{
 			BSBAR_VERIFY_TYPE(value, number, key);
 			if (value.is_integer())
-				m_max_volume = **value.as_integer();
+				m_max_volume = percentage_to_pa_volume_t(**value.as_integer());
 			else
-				m_max_volume = **value.as_floating_point();
+				m_max_volume = percentage_to_pa_volume_t(**value.as_floating_point());
 			return true;
 		}
 		else if (key == "volume-step")
 		{
 			BSBAR_VERIFY_TYPE(value, number, key);
 			if (value.is_integer())
-				m_volume_step = **value.as_integer();
+				m_volume_step = percentage_to_pa_volume_t(**value.as_integer());
 			else
-				m_volume_step = **value.as_floating_point();
+				m_volume_step = percentage_to_pa_volume_t(**value.as_floating_point());
+			return true;
+		}
+		else if (key == "global-volume-cap")
+		{
+			BSBAR_VERIFY_TYPE(value, boolean, key);
+			m_verify_volume = **value.as_boolean();
 			return true;
 		}
 
@@ -256,10 +286,9 @@ namespace bsbar
 		else
 			m_i3bar.erase("color");
 
-		auto max_volume = percentage_to_pa_volume_t(m_max_volume);
-		if (pa_cvolume_max(&s_sink_info.volume) > max_volume)
+		if (m_verify_volume && pa_cvolume_max(&s_sink_info.volume) > m_max_volume)
 		{
-			if (!pa_cvolume_set(&s_sink_info.volume, s_sink_info.volume.channels, max_volume))
+			if (!pa_cvolume_set(&s_sink_info.volume, s_sink_info.volume.channels, m_max_volume))
 				return false;
 			auto op = pa_context_set_sink_volume_by_index(s_server_info.context, s_sink_info.index, &s_sink_info.volume, NULL, NULL);
 			pa_operation_unref(op);
@@ -292,17 +321,14 @@ namespace bsbar
 			temp = s_sink_info.volume;
 		}
 
-		auto step		= percentage_to_pa_volume_t(m_volume_step);
-		auto max_volume	= percentage_to_pa_volume_t(m_max_volume);
-
 		switch (mouse.type)
 		{
 			case MouseType::ScrollUp:
-				if (!pa_cvolume_inc_clamp(&temp, step, max_volume))
+				if (!pa_cvolume_inc_clamp(&temp, m_volume_step, m_max_volume))
 					return false;
 				break;
 			case MouseType::ScrollDown:
-				if (!pa_cvolume_dec(&temp, step))
+				if (!pa_cvolume_dec(&temp, m_volume_step))
 					return false;
 				break;
 		}
