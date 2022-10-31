@@ -80,6 +80,8 @@ namespace bsbar
 			block = std::make_unique<NetworkBlock>();
 		else if (*type == "internal/pulseaudio")
 			block = std::make_unique<PulseAudioBlock>();
+		else if (*type == "internal/pulseaudio.input")
+			block = std::make_unique<PulseAudioInputBlock>();
 		else if (*type == "internal/temperature")
 			block = std::make_unique<TemperatureBlock>();
 		else if (*type == "custom")

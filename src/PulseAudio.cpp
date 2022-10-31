@@ -52,7 +52,7 @@ namespace bsbar
 	static T pa_cvolume_to_percentage(const pa_cvolume* volume)
 	{
 		if (!pa_cvolume_valid(volume))
-			return 0.0;
+			return T(0);
 		return (T)pa_cvolume_avg(volume) / T(PA_VOLUME_NORM) * T(100);
 	}
 
@@ -170,6 +170,9 @@ namespace bsbar
 
 	static bool pa_initialize()
 	{
+		if (s_server_info.initialized)
+			return true;
+
 		s_server_info.mainloop = pa_mainloop_new();
 		if (!s_server_info.mainloop)
 		{
@@ -194,6 +197,9 @@ namespace bsbar
 
 		pa_context_set_state_callback(s_server_info.context, context_state_callback, NULL);
 
+		s_server_info.initialized = true;
+		s_thread = std::thread(&pa_run);
+
 		return true;
 	}
 
@@ -217,15 +223,9 @@ namespace bsbar
 
 	PulseAudioBlock::PulseAudioBlock()
 	{
-		if (!s_server_info.initialized)
-		{
-			if (!pa_initialize())
-				exit(1);
-			atexit(pa_cleanup);
-			s_server_info.initialized = true;
-			s_thread = std::thread(&pa_run);
-		}
-
+		if (!pa_initialize())
+			exit(1);
+		
 		m_max_volume	= percentage_to_pa_volume_t<uint32_t>(100);
 		m_volume_step	= percentage_to_pa_volume_t<uint32_t>(5);
 	}
@@ -359,6 +359,74 @@ namespace bsbar
 			s_sink_info.wait_update_for(lock, 100ms);
 			pa_operation_unref(op);
 		}
+
+		return true;
+	}
+
+
+
+	PulseAudioInputBlock::PulseAudioInputBlock()
+	{
+		if (!pa_initialize())
+			exit(1);
+	}
+
+	bool PulseAudioInputBlock::add_custom_config(std::string_view key, toml::node& value)
+	{
+		if (key == "format-muted")
+		{
+			BSBAR_VERIFY_TYPE(value, string, key);
+			m_format_muted = **value.as_string();
+			return true;
+		}
+		else if (key == "color-muted")
+		{
+			BSBAR_VERIFY_TYPE(value, string, key);
+			m_color_muted = **value.as_string();
+			return true;
+		}
+		else if (key == "click-to-mute")
+		{
+			BSBAR_VERIFY_TYPE(value, boolean, key);
+			m_click_to_mute = **value.as_boolean();
+			return true;
+		}
+
+		return false;
+	}
+
+	bool PulseAudioInputBlock::custom_update(time_point tp)
+	{
+		std::scoped_lock _(s_source_info.mutex, m_mutex);
+
+		if (m_format_muted && s_source_info.muted)
+			m_text = *m_format_muted;
+		else
+			m_text = m_format;
+
+		if (m_color_muted && s_source_info.muted)
+			m_i3bar["color"] = { .is_string = true, .value = *m_color_muted };
+		else
+			m_i3bar.erase("color");
+
+		m_value.value = pa_cvolume_to_percentage<double>(&s_source_info.volume);
+
+		return true;
+	}
+
+	bool PulseAudioInputBlock::handle_custom_click(const MouseInfo& mouse)
+	{
+		if (!m_click_to_mute)
+			return true;
+
+		if (mouse.type != MouseType::Left)
+			return true;
+
+		std::unique_lock lock(s_source_info.mutex);
+
+		auto op = pa_context_set_source_mute_by_index(s_server_info.context, s_source_info.index, !s_source_info.muted, NULL, NULL);
+		s_source_info.wait_update_for(lock, 100ms);
+		pa_operation_unref(op);
 
 		return true;
 	}
