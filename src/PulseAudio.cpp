@@ -10,7 +10,7 @@ namespace bsbar
 {
 	using namespace std::chrono_literals;
 
-	struct PaData
+	struct ServerInfo
 	{
 		bool				initialized		= false;
 
@@ -18,17 +18,14 @@ namespace bsbar
 		pa_mainloop_api*	mainloop_api	= NULL;
 		pa_context*			context			= NULL;
 	};
-	static PaData		s_pa_data;
+	static ServerInfo	s_server_info;
 	static std::thread	s_thread;
 
-	struct VolumeInfo
+	struct SinkInfo
 	{
-		pa_cvolume	volume	= {};
-		bool		muted	= false;
-		uint32_t	index	= 0;
-		std::string	sink;
-
-
+		pa_cvolume				volume	= {};
+		bool					muted	= false;
+		uint32_t				index	= 0;
 
 		bool					updated	= false;
 		std::mutex				mutex;
@@ -47,14 +44,14 @@ namespace bsbar
 			cv.notify_all();
 		}
 	};
-	static VolumeInfo s_volume_info;
+	static SinkInfo s_sink_info;
 
 	template<typename T>
 	static T pa_cvolume_to_percentage(const pa_cvolume* volume)
 	{
 		if (!pa_cvolume_valid(volume))
 			return 0.0;
-		return (T)pa_cvolume_avg(volume) / (T)PA_VOLUME_NORM * T(100);
+		return (T)pa_cvolume_avg(volume) / T(PA_VOLUME_NORM) * T(100);
 	}
 
 	template<typename T>
@@ -67,56 +64,55 @@ namespace bsbar
 	static int pa_run()
 	{
 		int ret = 1;
-		if (pa_mainloop_run(s_pa_data.mainloop, &ret) < 0)
+		if (pa_mainloop_run(s_server_info.mainloop, &ret) < 0)
 			return ret;
 		return ret;
 	}
 
 	static void pa_quit(int ret)
 	{
-		if (s_pa_data.mainloop_api)
-			s_pa_data.mainloop_api->quit(s_pa_data.mainloop_api, ret);
+		if (s_server_info.mainloop_api)
+			s_server_info.mainloop_api->quit(s_server_info.mainloop_api, ret);
 	}
 
 
-	static void sink_info_callback(pa_context* c, const pa_sink_info* info, int eol, void*)
+	static void sink_info_callback(pa_context* context, const pa_sink_info* info, int eol, void*)
 	{
 		if (!info)
 			return;
 
+		std::scoped_lock _(s_sink_info.mutex);
 
-		std::scoped_lock _(s_volume_info.mutex);
+		s_sink_info.volume	= info->volume;
+		s_sink_info.muted	= info->mute;
+		s_sink_info.index	= info->index;
 
-		s_volume_info.volume	= info->volume;
-		s_volume_info.muted		= info->mute;
-		s_volume_info.index		= info->index;
-
-		s_volume_info.update();
+		s_sink_info.update();
 	}
 
-	static void server_info_callback(pa_context* c, const pa_server_info *i, void*)
+	static void server_info_callback(pa_context* context, const pa_server_info* info, void*)
 	{
-		pa_context_get_sink_info_by_name(c, i->default_sink_name, sink_info_callback, NULL);
-
-		std::scoped_lock _(s_volume_info.mutex);
-		s_volume_info.sink = i->default_sink_name;
+		pa_context_get_sink_info_by_name(context, info->default_sink_name, sink_info_callback, NULL);
 	}
 
-	static void subscribe_callback(pa_context* c, pa_subscription_event_type_t type, uint32_t idx, void*)
+	static void subscribe_callback(pa_context* context, pa_subscription_event_type_t type, uint32_t index, void*)
 	{
 		unsigned facility = type & PA_SUBSCRIPTION_EVENT_FACILITY_MASK;
-		//type &= PA_SUBSCRIPTION_EVENT_TYPE_MASK;
 
 		pa_operation *op = NULL;
 
 		switch (facility)
 		{
 			case PA_SUBSCRIPTION_EVENT_SINK:
-				op = pa_context_get_sink_info_by_index(c, idx, sink_info_callback, NULL);
+				op = pa_context_get_sink_info_by_index(context, index, sink_info_callback, NULL);
+				break;
+
+			case PA_SUBSCRIPTION_EVENT_SERVER:
+				op = pa_context_get_server_info(context, server_info_callback, NULL);
 				break;
 
 			default:
-				assert(false);
+				fprintf(stderr, "pa_event %u\n", facility);
 				break;
 		}
 
@@ -137,7 +133,7 @@ namespace bsbar
 				pa_context_get_server_info(context, server_info_callback, NULL);
 
 				pa_context_set_subscribe_callback(context, subscribe_callback, NULL);
-				pa_context_subscribe(context, PA_SUBSCRIPTION_MASK_SINK, NULL, NULL);
+				pa_context_subscribe(context, PA_SUBSCRIPTION_MASK_ALL, NULL, NULL);
 				break;
 
 			case PA_CONTEXT_TERMINATED:
@@ -153,46 +149,46 @@ namespace bsbar
 
 	static bool pa_initialize()
 	{
-		s_pa_data.mainloop = pa_mainloop_new();
-		if (!s_pa_data.mainloop)
+		s_server_info.mainloop = pa_mainloop_new();
+		if (!s_server_info.mainloop)
 		{
 			std::cerr << "pa_mainloop_new()" << std::endl;
 			return false;
 		}
 
-		s_pa_data.mainloop_api = pa_mainloop_get_api(s_pa_data.mainloop);
+		s_server_info.mainloop_api = pa_mainloop_get_api(s_server_info.mainloop);
 
-		s_pa_data.context = pa_context_new(s_pa_data.mainloop_api, "PulseAudio Test");
-		if (!s_pa_data.context)
+		s_server_info.context = pa_context_new(s_server_info.mainloop_api, "PulseAudio Test");
+		if (!s_server_info.context)
 		{
 			std::cerr << "pa_context_new()" << std::endl;
 			return false;
 		}
 		
-		if (pa_context_connect(s_pa_data.context, NULL, PA_CONTEXT_NOAUTOSPAWN, NULL) < 0)
+		if (pa_context_connect(s_server_info.context, NULL, PA_CONTEXT_NOAUTOSPAWN, NULL) < 0)
 		{
 			std::cerr << "pa_context_connect()" << std::endl;
 			return false;
 		}
 
-		pa_context_set_state_callback(s_pa_data.context, context_state_callback, NULL);
+		pa_context_set_state_callback(s_server_info.context, context_state_callback, NULL);
 
 		return true;
 	}
 
 	static void pa_cleanup()
 	{
-		if (s_pa_data.context)
+		if (s_server_info.context)
 		{
-			pa_context_unref(s_pa_data.context);
-			s_pa_data.context = NULL;
+			pa_context_unref(s_server_info.context);
+			s_server_info.context = NULL;
 		}
 
-		if (s_pa_data.mainloop)
+		if (s_server_info.mainloop)
 		{
-			pa_mainloop_free(s_pa_data.mainloop);
-			s_pa_data.mainloop = NULL;
-			s_pa_data.mainloop_api = NULL;
+			pa_mainloop_free(s_server_info.mainloop);
+			s_server_info.mainloop = NULL;
+			s_server_info.mainloop_api = NULL;
 		}
 	}
 
@@ -200,12 +196,12 @@ namespace bsbar
 
 	PulseAudioBlock::PulseAudioBlock()
 	{
-		if (!s_pa_data.initialized)
+		if (!s_server_info.initialized)
 		{
 			if (!pa_initialize())
 				exit(1);
 			atexit(pa_cleanup);
-			s_pa_data.initialized = true;
+			s_server_info.initialized = true;
 			s_thread = std::thread(&pa_run);
 		}
 	}
@@ -248,38 +244,41 @@ namespace bsbar
 
 	bool PulseAudioBlock::custom_update(time_point tp)
 	{
-		std::scoped_lock _(s_volume_info.mutex, m_mutex);
+		std::scoped_lock _(s_sink_info.mutex, m_mutex);
 
-		if (m_format_muted && s_volume_info.muted)
+		if (m_format_muted && s_sink_info.muted)
 			m_text = *m_format_muted;
 		else
 			m_text = m_format;
 
-		if (m_color_muted && s_volume_info.muted)
+		if (m_color_muted && s_sink_info.muted)
 			m_i3bar["color"] = { .is_string = true, .value = *m_color_muted };
 		else
 			m_i3bar.erase("color");
 
 		auto max_volume = percentage_to_pa_volume_t(m_max_volume);
-		if (pa_cvolume_max(&s_volume_info.volume) > max_volume)
+		if (pa_cvolume_max(&s_sink_info.volume) > max_volume)
 		{
-			if (!pa_cvolume_set(&s_volume_info.volume, s_volume_info.volume.channels, max_volume))
+			if (!pa_cvolume_set(&s_sink_info.volume, s_sink_info.volume.channels, max_volume))
 				return false;
-			auto op = pa_context_set_sink_volume_by_index(s_pa_data.context, s_volume_info.index, &s_volume_info.volume, NULL, NULL);
+			auto op = pa_context_set_sink_volume_by_index(s_server_info.context, s_sink_info.index, &s_sink_info.volume, NULL, NULL);
 			pa_operation_unref(op);
 		}
 
-		m_value.value = pa_cvolume_to_percentage<double>(&s_volume_info.volume);
+		m_value.value = pa_cvolume_to_percentage<double>(&s_sink_info.volume);
 
 		return true;
 	}
 
 	bool PulseAudioBlock::handle_custom_click(const MouseInfo& mouse)
 	{
-		std::unique_lock lock(s_volume_info.mutex);
+		if (mouse.type != MouseType::Left)
+			return true;
 
-		auto op = pa_context_set_sink_mute_by_index(s_pa_data.context, s_volume_info.index, !s_volume_info.muted, NULL, NULL);
-		s_volume_info.wait_update_for(lock, 100ms);
+		std::unique_lock lock(s_sink_info.mutex);
+
+		auto op = pa_context_set_sink_mute_by_index(s_server_info.context, s_sink_info.index, !s_sink_info.muted, NULL, NULL);
+		s_sink_info.wait_update_for(lock, 100ms);
 		pa_operation_unref(op);
 
 		return true;
@@ -289,8 +288,8 @@ namespace bsbar
 	{
 		pa_cvolume temp;
 		{
-			std::scoped_lock _(s_volume_info.mutex);
-			temp = s_volume_info.volume;
+			std::scoped_lock _(s_sink_info.mutex);
+			temp = s_sink_info.volume;
 		}
 
 		auto step		= percentage_to_pa_volume_t(m_volume_step);
@@ -308,12 +307,12 @@ namespace bsbar
 				break;
 		}
 
-		std::unique_lock lock(s_volume_info.mutex);
+		std::unique_lock lock(s_sink_info.mutex);
 
-		if (!pa_cvolume_equal(&temp, &s_volume_info.volume))
+		if (!pa_cvolume_equal(&temp, &s_sink_info.volume))
 		{
-			auto op = pa_context_set_sink_volume_by_index(s_pa_data.context, s_volume_info.index, &temp, NULL, NULL);
-			s_volume_info.wait_update_for(lock, 100ms);
+			auto op = pa_context_set_sink_volume_by_index(s_server_info.context, s_sink_info.index, &temp, NULL, NULL);
+			s_sink_info.wait_update_for(lock, 100ms);
 			pa_operation_unref(op);
 		}
 
