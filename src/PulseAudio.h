@@ -15,8 +15,9 @@ namespace bsbar
 		virtual bool handle_custom_scroll(const MouseInfo& mouse) override;
 
 	private:
-		std::optional<std::string> m_format_muted;
-		std::optional<std::string> m_color_muted;
+		std::optional<std::string>	m_format_muted;
+		std::optional<std::string>	m_color_muted;
+		uint32_t					m_max_volume	= 100;
 	};
 
 }

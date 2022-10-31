@@ -49,17 +49,18 @@ namespace bsbar
 	};
 	static VolumeInfo s_volume_info;
 
-
-	static double pa_cvolume_to_percentage(const pa_cvolume* volume)
+	template<typename T>
+	static T pa_cvolume_to_percentage(const pa_cvolume* volume)
 	{
 		if (!pa_cvolume_valid(volume))
 			return 0.0;
-		return (double)pa_cvolume_avg(volume) / (double)PA_VOLUME_NORM * 100.0;
+		return (T)pa_cvolume_avg(volume) / (T)PA_VOLUME_NORM * T(100);
 	}
 
-	static pa_volume_t percentage_to_pa_volume_t(double percentage)
+	template<typename T>
+	static constexpr pa_volume_t percentage_to_pa_volume_t(T percentage)
 	{
-		return (pa_volume_t)(percentage * (double)PA_VOLUME_NORM / 100.0);
+		return (pa_volume_t)(percentage * T(PA_VOLUME_NORM) / T(100));
 	}
 
 
@@ -220,8 +221,17 @@ namespace bsbar
 			m_i3bar["color"] = { .is_string = true, .value = *m_color_muted };
 		else
 			m_i3bar.erase("color");
-	
-		m_value.value = pa_cvolume_to_percentage(&s_volume_info.volume);
+
+		auto max_volume = percentage_to_pa_volume_t<uint32_t>(m_max_volume);
+		if (pa_cvolume_max(&s_volume_info.volume) > max_volume)
+		{
+			if (!pa_cvolume_set(&s_volume_info.volume, s_volume_info.volume.channels, max_volume))
+				return false;
+			auto op = pa_context_set_sink_volume_by_index(s_pa_data.context, s_volume_info.index, &s_volume_info.volume, NULL, NULL);
+			pa_operation_unref(op);
+		}
+
+		m_value.value = pa_cvolume_to_percentage<double>(&s_volume_info.volume);
 
 		return true;
 	}
@@ -240,6 +250,12 @@ namespace bsbar
 			m_color_muted = **value.as_string();
 			return true;
 		}
+		else if (key == "max-volume")
+		{
+			BSBAR_VERIFY_TYPE(value, integer, key);
+			m_max_volume = **value.as_integer();
+			return true;
+		}
 
 		return false;
 	}
@@ -249,8 +265,9 @@ namespace bsbar
 	{
 		std::unique_lock lock(s_volume_info.mutex);
 
-		pa_context_set_sink_mute_by_index(s_pa_data.context, s_volume_info.index, !s_volume_info.muted, NULL, NULL);
+		auto op = pa_context_set_sink_mute_by_index(s_pa_data.context, s_volume_info.index, !s_volume_info.muted, NULL, NULL);
 		s_volume_info.wait_update_for(lock, 100ms);
+		pa_operation_unref(op);
 
 		return true;
 	}
@@ -263,12 +280,13 @@ namespace bsbar
 			temp = s_volume_info.volume;
 		}
 
-		auto diff = percentage_to_pa_volume_t(5.0);
+		constexpr auto diff = percentage_to_pa_volume_t<uint32_t>(5);
+		auto max_volume = percentage_to_pa_volume_t<uint32_t>(m_max_volume);
 
 		switch (mouse.type)
 		{
 			case MouseType::ScrollUp:
-				if (!pa_cvolume_inc(&temp, diff))
+				if (!pa_cvolume_inc_clamp(&temp, diff, max_volume))
 					return false;
 				break;
 			case MouseType::ScrollDown:
@@ -281,8 +299,9 @@ namespace bsbar
 
 		if (!pa_cvolume_equal(&temp, &s_volume_info.volume))
 		{
-			pa_context_set_sink_volume_by_index(s_pa_data.context, s_volume_info.index, &temp, NULL, NULL);
+			auto op = pa_context_set_sink_volume_by_index(s_pa_data.context, s_volume_info.index, &temp, NULL, NULL);
 			s_volume_info.wait_update_for(lock, 100ms);
+			pa_operation_unref(op);
 		}
 
 		return true;
