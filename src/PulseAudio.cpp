@@ -198,11 +198,8 @@ namespace bsbar
 
 
 
-
-
-	bool PulseAudioBlock::custom_update(time_point tp)
+	PulseAudioBlock::PulseAudioBlock()
 	{
-		std::scoped_lock _(s_volume_info.mutex, m_mutex);
 		if (!s_pa_data.initialized)
 		{
 			if (!pa_initialize())
@@ -211,29 +208,6 @@ namespace bsbar
 			s_pa_data.initialized = true;
 			s_thread = std::thread(&pa_run);
 		}
-
-		if (m_format_muted && s_volume_info.muted)
-			m_text = *m_format_muted;
-		else
-			m_text = m_format;
-
-		if (m_color_muted && s_volume_info.muted)
-			m_i3bar["color"] = { .is_string = true, .value = *m_color_muted };
-		else
-			m_i3bar.erase("color");
-
-		auto max_volume = percentage_to_pa_volume_t<uint32_t>(m_max_volume);
-		if (pa_cvolume_max(&s_volume_info.volume) > max_volume)
-		{
-			if (!pa_cvolume_set(&s_volume_info.volume, s_volume_info.volume.channels, max_volume))
-				return false;
-			auto op = pa_context_set_sink_volume_by_index(s_pa_data.context, s_volume_info.index, &s_volume_info.volume, NULL, NULL);
-			pa_operation_unref(op);
-		}
-
-		m_value.value = pa_cvolume_to_percentage<double>(&s_volume_info.volume);
-
-		return true;
 	}
 
 	bool PulseAudioBlock::add_custom_config(std::string_view key, toml::node& value)
@@ -260,6 +234,33 @@ namespace bsbar
 		return false;
 	}
 
+	bool PulseAudioBlock::custom_update(time_point tp)
+	{
+		std::scoped_lock _(s_volume_info.mutex, m_mutex);
+
+		if (m_format_muted && s_volume_info.muted)
+			m_text = *m_format_muted;
+		else
+			m_text = m_format;
+
+		if (m_color_muted && s_volume_info.muted)
+			m_i3bar["color"] = { .is_string = true, .value = *m_color_muted };
+		else
+			m_i3bar.erase("color");
+
+		auto max_volume = percentage_to_pa_volume_t<uint32_t>(m_max_volume);
+		if (pa_cvolume_max(&s_volume_info.volume) > max_volume)
+		{
+			if (!pa_cvolume_set(&s_volume_info.volume, s_volume_info.volume.channels, max_volume))
+				return false;
+			auto op = pa_context_set_sink_volume_by_index(s_pa_data.context, s_volume_info.index, &s_volume_info.volume, NULL, NULL);
+			pa_operation_unref(op);
+		}
+
+		m_value.value = pa_cvolume_to_percentage<double>(&s_volume_info.volume);
+
+		return true;
+	}
 
 	bool PulseAudioBlock::handle_custom_click(const MouseInfo& mouse)
 	{
