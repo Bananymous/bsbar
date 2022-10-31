@@ -19,7 +19,8 @@ namespace bsbar
 	private:
 		std::optional<std::string>	m_format_muted;
 		std::optional<std::string>	m_color_muted;
-		uint32_t					m_max_volume	= 100;
+		double						m_max_volume	= 100.0;
+		double						m_volume_step	= 5.0;
 	};
 
 }

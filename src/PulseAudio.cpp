@@ -226,8 +226,20 @@ namespace bsbar
 		}
 		else if (key == "max-volume")
 		{
-			BSBAR_VERIFY_TYPE(value, integer, key);
-			m_max_volume = **value.as_integer();
+			BSBAR_VERIFY_TYPE(value, number, key);
+			if (value.is_integer())
+				m_max_volume = **value.as_integer();
+			else
+				m_max_volume = **value.as_floating_point();
+			return true;
+		}
+		else if (key == "volume-step")
+		{
+			BSBAR_VERIFY_TYPE(value, number, key);
+			if (value.is_integer())
+				m_volume_step = **value.as_integer();
+			else
+				m_volume_step = **value.as_floating_point();
 			return true;
 		}
 
@@ -248,7 +260,7 @@ namespace bsbar
 		else
 			m_i3bar.erase("color");
 
-		auto max_volume = percentage_to_pa_volume_t<uint32_t>(m_max_volume);
+		auto max_volume = percentage_to_pa_volume_t(m_max_volume);
 		if (pa_cvolume_max(&s_volume_info.volume) > max_volume)
 		{
 			if (!pa_cvolume_set(&s_volume_info.volume, s_volume_info.volume.channels, max_volume))
@@ -281,17 +293,17 @@ namespace bsbar
 			temp = s_volume_info.volume;
 		}
 
-		constexpr auto diff = percentage_to_pa_volume_t<uint32_t>(5);
-		auto max_volume = percentage_to_pa_volume_t<uint32_t>(m_max_volume);
+		auto step		= percentage_to_pa_volume_t(m_volume_step);
+		auto max_volume	= percentage_to_pa_volume_t(m_max_volume);
 
 		switch (mouse.type)
 		{
 			case MouseType::ScrollUp:
-				if (!pa_cvolume_inc_clamp(&temp, diff, max_volume))
+				if (!pa_cvolume_inc_clamp(&temp, step, max_volume))
 					return false;
 				break;
 			case MouseType::ScrollDown:
-				if (!pa_cvolume_dec(&temp, diff))
+				if (!pa_cvolume_dec(&temp, step))
 					return false;
 				break;
 		}
