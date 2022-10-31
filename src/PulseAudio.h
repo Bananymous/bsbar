@@ -22,6 +22,8 @@ namespace bsbar
 		uint32_t					m_max_volume;
 		uint32_t					m_volume_step;
 		bool						m_verify_volume = true;
+		bool						m_enable_scroll = true;
+		bool						m_click_to_mute = true;
 	};
 
 }

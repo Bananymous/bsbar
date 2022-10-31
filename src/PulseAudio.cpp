@@ -268,6 +268,18 @@ namespace bsbar
 			m_verify_volume = **value.as_boolean();
 			return true;
 		}
+		else if (key == "enable-scroll")
+		{
+			BSBAR_VERIFY_TYPE(value, boolean, key);
+			m_enable_scroll = **value.as_boolean();
+			return true;
+		}
+		else if (key == "click-to-mute")
+		{
+			BSBAR_VERIFY_TYPE(value, boolean, key);
+			m_click_to_mute = **value.as_boolean();
+			return true;
+		}
 
 		return false;
 	}
@@ -301,6 +313,9 @@ namespace bsbar
 
 	bool PulseAudioBlock::handle_custom_click(const MouseInfo& mouse)
 	{
+		if (!m_click_to_mute)
+			return true;
+
 		if (mouse.type != MouseType::Left)
 			return true;
 
@@ -315,6 +330,9 @@ namespace bsbar
 
 	bool PulseAudioBlock::handle_custom_scroll(const MouseInfo& mouse)
 	{
+		if (!m_enable_scroll)
+			return true;
+
 		pa_cvolume temp;
 		{
 			std::scoped_lock _(s_sink_info.mutex);
