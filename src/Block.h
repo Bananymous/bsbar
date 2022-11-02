@@ -39,6 +39,8 @@ namespace bsbar
 
 		void print() const;
 
+		void initialize();
+
 		std::string_view get_name() const		{ return m_type; }
 		std::string_view get_instance() const	{ return m_name; }
 
@@ -53,7 +55,13 @@ namespace bsbar
 		bool handle_slider_scroll(const MouseInfo& mouse);
 
 	protected:
+		virtual void custom_initialize() {};
+
+		virtual bool custom_is_valid() const { return true; }
+		virtual void custom_config_done() {}
+
 		virtual bool custom_update(time_point tp) = 0;
+		virtual bool custom_print() const { return true; }
 
 		virtual bool handle_custom_click(const MouseInfo& mouse) { return true; }
 		virtual bool handle_custom_scroll(const MouseInfo& mouse) { return true; }

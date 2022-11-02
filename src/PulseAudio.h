@@ -10,6 +10,8 @@ namespace bsbar
 	public:
 		PulseAudioBlock();
 
+		virtual void custom_initialize() override;
+
 		virtual bool custom_update(time_point tp) override;
 		virtual bool add_custom_config(std::string_view key, toml::node& value) override;
 
@@ -29,7 +31,7 @@ namespace bsbar
 	class PulseAudioInputBlock : public Block
 	{
 	public:
-		PulseAudioInputBlock();
+		virtual void custom_initialize() override;
 
 		virtual bool custom_update(time_point tp) override;
 		virtual bool add_custom_config(std::string_view key, toml::node& value) override;

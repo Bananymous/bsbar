@@ -219,15 +219,16 @@ namespace bsbar
 		}
 	}
 
-
-
 	PulseAudioBlock::PulseAudioBlock()
+	{
+		m_max_volume	= percentage_to_pa_volume_t<uint32_t>(100);
+		m_volume_step	= percentage_to_pa_volume_t<uint32_t>(5);
+	}
+
+	void PulseAudioBlock::custom_initialize()
 	{
 		if (!pa_initialize())
 			exit(1);
-		
-		m_max_volume	= percentage_to_pa_volume_t<uint32_t>(100);
-		m_volume_step	= percentage_to_pa_volume_t<uint32_t>(5);
 	}
 
 	bool PulseAudioBlock::add_custom_config(std::string_view key, toml::node& value)
@@ -364,8 +365,7 @@ namespace bsbar
 	}
 
 
-
-	PulseAudioInputBlock::PulseAudioInputBlock()
+	void PulseAudioInputBlock::custom_initialize()
 	{
 		if (!pa_initialize())
 			exit(1);

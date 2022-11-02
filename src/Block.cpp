@@ -106,10 +106,9 @@ namespace bsbar
 				block->add_config(key, node);
 		}
 
+		block->custom_config_done();
 		if (!block->is_valid())
 			exit(1);
-
-		block->m_thread = std::thread(&Block::update_thread, block.get());
 
 		return block;
 	}
@@ -127,6 +126,9 @@ namespace bsbar
 			std::cerr << "No ramp strings specified for module '" << m_name << "', but %ramp% used in format" << std::endl;
 			return false;
 		}
+
+		if (!custom_is_valid())
+			return false;
 
 		return true;
 	}
@@ -186,12 +188,15 @@ namespace bsbar
 	{
 		std::scoped_lock _(m_mutex);
 
+		if (!custom_print())
+			return;
+
 		std::printf("{");
 		std::printf( "\"name\":\"%s\"",			m_type.c_str());
 		std::printf(",\"instance\":\"%s\"",		m_name.c_str());
 		std::printf(",\"full_text\":\"%s\"",	m_text.c_str());
 
-		for (auto& [key, value] : m_i3bar)
+		for (const auto& [key, value] : m_i3bar)
 		{
 			if (value.is_string)
 				std::printf(",\"%s\":\"%s\"", key.c_str(), value.value.c_str());
@@ -200,6 +205,12 @@ namespace bsbar
 		}
 
 		std::printf("}");
+	}
+
+	void Block::initialize()
+	{
+		custom_initialize();
+		m_thread = std::thread(&Block::update_thread, this);
 	}
 
 	bool Block::handle_click(const MouseInfo& mouse)
@@ -379,6 +390,9 @@ namespace bsbar
 
 	void Block::add_subconfig(std::string_view sub, std::string_view key, toml::node& value)
 	{
+		if (add_custom_subconfig(sub, key, value))
+			return;
+
 		if (sub == "click")
 		{
 			if (key == "command")
@@ -413,7 +427,7 @@ namespace bsbar
 		}
 		else
 		{
-			std::cerr << "Unknown submodule '" << m_name << '.' << sub << std::endl;
+			std::cerr << "Unknown submodule '" << m_name << '.' << sub << '\'' << std::endl;
 			std::cerr << "  " << value.source() << std::endl;
 			exit(1);
 		}

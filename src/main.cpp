@@ -158,6 +158,9 @@ int main(int argc, char** argv, char** env)
 	auto config = bsbar::parse_config(config_path);
 	s_blocks = std::move(config.blocks);
 
+	for (auto& block : s_blocks)
+		block->initialize();
+
 	// Assing signal handler for all signals between SIGRTMIN and SIGRTMAX
 	for (int sig = SIGRTMIN; sig <= SIGRTMAX; sig++)
 		std::signal(sig, signal_handler);
