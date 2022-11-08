@@ -41,8 +41,8 @@ namespace bsbar
 
 		void initialize();
 
-		std::string_view get_name() const		{ return m_type; }
-		std::string_view get_instance() const	{ return m_name; }
+		const std::string& get_name() const		{ return m_type; }
+		const std::string& get_instance() const	{ return m_name; }
 
 		void update_clock_tick();
 		void request_update(bool print = false);
@@ -51,6 +51,9 @@ namespace bsbar
 
 		bool handle_click(const MouseInfo& mouse, std::string_view sub);
 		bool handle_scroll(const MouseInfo& mouse, std::string_view sub);
+
+		void add_config(std::string_view key, toml::node& value);
+		void add_subconfig(std::string_view sub, toml::table& table);
 
 	protected:
 		virtual void custom_initialize() {};
@@ -65,9 +68,7 @@ namespace bsbar
 		virtual bool handle_custom_scroll(const MouseInfo& mouse, std::string_view sub) { return true; }
 
 		virtual bool add_custom_config(std::string_view key, toml::node& value) { return false; }
-		virtual bool add_custom_subconfig(std::string_view sub, std::string_view key, toml::node& value) { return false; }
-		void add_config(std::string_view key, toml::node& value);
-		void add_subconfig(std::string_view sub, std::string_view key, toml::node& value);
+		virtual bool add_custom_subconfig(std::string_view sub, toml::table& table) { return false; }
 
 	private:
 		void update_thread();

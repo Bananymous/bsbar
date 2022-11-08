@@ -68,7 +68,7 @@ namespace bsbar
 		{
 			std::cerr << "key 'type' not defined for module '" << name << '\'' << std::endl;
 			std::cerr << "  " << table.source() << std::endl;
-			return nullptr;
+			exit(1);
 		}
 
 		std::unique_ptr<Block> block = nullptr;
@@ -88,13 +88,13 @@ namespace bsbar
 		else if (*type == "internal/temperature")
 			block = std::make_unique<TemperatureBlock>();
 		else if (*type == "custom")
-			block = std::make_unique<CustomBlock>();	
+			block = std::make_unique<CustomBlock>();
 
 		if (!block)
 		{
 			std::cerr << "Unknown value for key 'type' in module '" << name << '\'' << std::endl;
 			std::cerr << "  " << table["type"].node()->source() << std::endl;
-			return nullptr;
+			exit(1);
 		}
 
 		block->m_name = name;
@@ -103,8 +103,7 @@ namespace bsbar
 		for (auto& [key, node] : table)
 		{
 			if (node.is_table())
-				for (auto& [sub_key, sub_node] : *node.as_table())
-					block->add_subconfig(key, sub_key, sub_node);
+				block->add_subconfig(key, *node.as_table());
 			else
 				block->add_config(key, node);
 		}
@@ -331,6 +330,11 @@ namespace bsbar
 			BSBAR_VERIFY_TYPE(value, string, key);
 			m_format = **value.as_string();
 		}
+		else if (key == "click-command")
+		{
+			BSBAR_VERIFY_TYPE(value, string, key);
+			m_on_click.command = **value.as_string();
+		}
 		else if (key == "ramp")
 		{
 			BSBAR_VERIFY_TYPE_CUSTOM_MESSAGE(value, array, "value for key 'ramp' must be an array of strings");
@@ -376,48 +380,51 @@ namespace bsbar
 		}
 	}
 
-	void Block::add_subconfig(std::string_view sub, std::string_view key, toml::node& value)
+	void Block::add_subconfig(std::string_view sub, toml::table& table)
 	{
-		if (add_custom_subconfig(sub, key, value))
+		if (add_custom_subconfig(sub, table))
 			return;
 
-		if (sub == "click")
+		for (auto& [key, value] : table)
 		{
-			if (key == "command")
+			if (sub == "click")
 			{
-				BSBAR_VERIFY_TYPE(value, string, key);
-				m_on_click.command = '"' + **value.as_string() + '"';
-			}
-			else if (key == "slider-show")
-			{
-				BSBAR_VERIFY_TYPE(value, string, key);
-				
-				std::string_view option = *value.value<std::string_view>();
-				if (option == "on")
-					m_on_click.slider_options = SliderOptions::On;
-				else if (option == "off")
-					m_on_click.slider_options = SliderOptions::Off;
-				else if (option == "toggle")
-					m_on_click.slider_options = SliderOptions::Toggle;
+				if (key == "command")
+				{
+					BSBAR_VERIFY_TYPE(value, string, key);
+					m_on_click.command = '"' + **value.as_string() + '"';
+				}
+				else if (key == "slider-show")
+				{
+					BSBAR_VERIFY_TYPE(value, string, key);
+					
+					std::string_view option = *value.value<std::string_view>();
+					if (option == "on")
+						m_on_click.slider_options = SliderOptions::On;
+					else if (option == "off")
+						m_on_click.slider_options = SliderOptions::Off;
+					else if (option == "toggle")
+						m_on_click.slider_options = SliderOptions::Toggle;
+					else
+					{
+						std::cerr << "unrecognized value for key '" << key << "'. valid keys are \"on\", \"off\", \"toggle\"" << std::endl;
+						std::cerr << "  " << value.source() << std::endl;
+						exit(1);
+					}
+				}
 				else
 				{
-					std::cerr << "unrecognized value for key '" << key << "'. valid keys are \"on\", \"off\", \"toggle\"" << std::endl;
+					std::cerr << "Unknown key '" << key << "' for module '" << m_name << '.' << sub << '\'' << std::endl;
 					std::cerr << "  " << value.source() << std::endl;
-					exit(1);
+					exit(1);	
 				}
 			}
 			else
 			{
-				std::cerr << "Unknown key '" << key << "' for module '" << m_name << '.' << sub << '\'' << std::endl;
+				std::cerr << "Unknown submodule '" << m_name << '.' << sub << '\'' << std::endl;
 				std::cerr << "  " << value.source() << std::endl;
-				exit(1);	
+				exit(1);
 			}
-		}
-		else
-		{
-			std::cerr << "Unknown submodule '" << m_name << '.' << sub << '\'' << std::endl;
-			std::cerr << "  " << value.source() << std::endl;
-			exit(1);
 		}
 	}
 

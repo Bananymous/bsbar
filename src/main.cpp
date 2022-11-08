@@ -130,7 +130,7 @@ static void handle_clicks()
 
 		for (auto& block : s_blocks)
 		{
-			if (block->get_name() == name && block->get_instance() == instance)
+			if (block->get_instance() == instance)
 			{
 				switch (mouse.type)
 				{
