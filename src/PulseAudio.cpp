@@ -312,12 +312,13 @@ namespace bsbar
 		return true;
 	}
 
-	bool PulseAudioBlock::handle_custom_click(const MouseInfo& mouse)
+	bool PulseAudioBlock::handle_custom_click(const MouseInfo& mouse, std::string_view sub)
 	{
 		if (!m_click_to_mute)
 			return true;
-
 		if (mouse.type != MouseType::Left)
+			return true;
+		if (!sub.empty())
 			return true;
 
 		std::unique_lock lock(s_sink_info.mutex);
@@ -329,9 +330,11 @@ namespace bsbar
 		return true;
 	}
 
-	bool PulseAudioBlock::handle_custom_scroll(const MouseInfo& mouse)
+	bool PulseAudioBlock::handle_custom_scroll(const MouseInfo& mouse, std::string_view sub)
 	{
 		if (!m_enable_scroll)
+			return true;
+		if (!sub.empty())
 			return true;
 
 		pa_cvolume temp;
@@ -414,12 +417,13 @@ namespace bsbar
 		return true;
 	}
 
-	bool PulseAudioInputBlock::handle_custom_click(const MouseInfo& mouse)
+	bool PulseAudioInputBlock::handle_custom_click(const MouseInfo& mouse, std::string_view sub)
 	{
 		if (!m_click_to_mute)
 			return true;
-
 		if (mouse.type != MouseType::Left)
+			return true;
+		if (!sub.empty())
 			return true;
 
 		std::unique_lock lock(s_source_info.mutex);

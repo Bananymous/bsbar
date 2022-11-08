@@ -15,6 +15,7 @@ project "bsbar"
 		"src/Custom.cpp",
 		"src/DateTime.cpp",
         "src/main.cpp",
+		"src/Menu.cpp",
 		"src/Network.cpp",
 		"src/PulseAudio.cpp",
 		"src/Temperature.cpp",

@@ -5,6 +5,7 @@
 #include "Battery.h"
 #include "Custom.h"
 #include "DateTime.h"
+#include "Menu.h"
 #include "Network.h"
 #include "PulseAudio.h"
 #include "Temperature.h"
@@ -76,6 +77,8 @@ namespace bsbar
 			block = std::make_unique<BatteryBlock>();
 		else if (*type == "internal/datetime")
 			block = std::make_unique<DateTimeBlock>();
+		else if (*type == "internal/menu")
+			block = std::make_unique<MenuBlock>();
 		else if (*type == "internal/network")
 			block = std::make_unique<NetworkBlock>();
 		else if (*type == "internal/pulseaudio")
@@ -213,9 +216,9 @@ namespace bsbar
 		m_thread = std::thread(&Block::update_thread, this);
 	}
 
-	bool Block::handle_click(const MouseInfo& mouse)
+	bool Block::handle_click(const MouseInfo& mouse, std::string_view sub)
 	{
-		if (!handle_custom_click(mouse))
+		if (!handle_custom_click(mouse, sub))
 			return false;
 
 		switch (m_on_click.slider_options)
@@ -243,25 +246,10 @@ namespace bsbar
 		return true;
 	}
 
-	bool Block::handle_slider_click(const MouseInfo& mouse)
+
+	bool Block::handle_scroll(const MouseInfo& mouse, std::string_view sub)
 	{
-		if (!handle_custom_slider_click(mouse))
-			return false;
-
-		return true;
-	}
-
-	bool Block::handle_scroll(const MouseInfo& mouse)
-	{
-		if (!handle_custom_scroll(mouse))
-			return false;
-
-		return true;
-	}
-
-	bool Block::handle_slider_scroll(const MouseInfo& mouse)
-	{
-		if (!handle_custom_slider_scroll(mouse))
+		if (!handle_custom_scroll(mouse, sub))
 			return false;
 
 		return true;

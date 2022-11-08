@@ -101,7 +101,13 @@ static void handle_clicks()
 		if (line_sv.front() == ',')
 			line_sv = line_sv.substr(1);
 
-		auto json = nlohmann::json::parse(line_sv);
+
+		nlohmann::json json;
+		try {
+			json = nlohmann::json::parse(line_sv);
+		} catch(...) {
+			continue;
+		}
 
 		if (!json.contains("name") || !json.contains("instance"))
 			continue;
@@ -110,18 +116,17 @@ static void handle_clicks()
 
 		std::string name		= json["name"];
 		std::string instance	= json["instance"];
+		std::string sub;
+
+		if (auto pos = instance.find('.'); pos != std::string::npos)
+		{
+			sub			= instance.substr(pos + 1);
+			instance	= instance.substr(0, pos);
+		}
 
 		bsbar::Block::MouseInfo mouse;
 		if (!parse_mouse_info(json, mouse))
 			continue;
-
-		bool slider = false;
-
-		if (instance.ends_with("-slider"))
-		{
-			instance = instance.substr(0, instance.size() - 7);
-			slider = true;
-		}
 
 		for (auto& block : s_blocks)
 		{
@@ -132,11 +137,11 @@ static void handle_clicks()
 					case bsbar::Block::MouseType::Left:
 					case bsbar::Block::MouseType::Middle:
 					case bsbar::Block::MouseType::Right:
-						slider ? block->handle_slider_click(mouse) : block->handle_click(mouse);
+						block->handle_click(mouse, sub);
 						break;
 					case bsbar::Block::MouseType::ScrollDown:
 					case bsbar::Block::MouseType::ScrollUp:
-						slider ? block->handle_slider_scroll(mouse) : block->handle_scroll(mouse);
+						block->handle_scroll(mouse, sub);
 						break;
 				}
 				block->request_update(true);

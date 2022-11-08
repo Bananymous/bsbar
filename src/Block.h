@@ -49,10 +49,8 @@ namespace bsbar
 
 		bool handles_signal(int signal) const;
 
-		bool handle_click(const MouseInfo& mouse);
-		bool handle_scroll(const MouseInfo& mouse);
-		bool handle_slider_click(const MouseInfo& mouse);
-		bool handle_slider_scroll(const MouseInfo& mouse);
+		bool handle_click(const MouseInfo& mouse, std::string_view sub);
+		bool handle_scroll(const MouseInfo& mouse, std::string_view sub);
 
 	protected:
 		virtual void custom_initialize() {};
@@ -63,10 +61,8 @@ namespace bsbar
 		virtual bool custom_update(time_point tp) = 0;
 		virtual bool custom_print() const { return true; }
 
-		virtual bool handle_custom_click(const MouseInfo& mouse) { return true; }
-		virtual bool handle_custom_scroll(const MouseInfo& mouse) { return true; }
-		virtual bool handle_custom_slider_click(const MouseInfo& mouse) { return true; }
-		virtual bool handle_custom_slider_scroll(const MouseInfo& mouse) { return true; }
+		virtual bool handle_custom_click(const MouseInfo& mouse, std::string_view sub) { return true; }
+		virtual bool handle_custom_scroll(const MouseInfo& mouse, std::string_view sub) { return true; }
 
 		virtual bool add_custom_config(std::string_view key, toml::node& value) { return false; }
 		virtual bool add_custom_subconfig(std::string_view sub, std::string_view key, toml::node& value) { return false; }
