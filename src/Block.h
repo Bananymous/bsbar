@@ -107,9 +107,11 @@ namespace bsbar
 		enum class SliderOptions { None, On, Off, Toggle };
 		struct
 		{
-			std::string		command;
-			bool			blocking = false;
-			SliderOptions	slider_options;
+			std::string			command;
+			std::atomic<bool>	blocking		= false;
+			std::atomic<bool>	is_running		= false;
+			std::atomic<bool>	single_instance	= false;
+			SliderOptions		slider_options;
 		} m_on_click;
 		struct
 		{

@@ -30,13 +30,13 @@ namespace bsbar
 {
 
 	// If block is false, the child process is left as a zombie
-	static bool exec(const std::string& command, bool block)
+	static pid_t execute_command(const std::string& command)
 	{
 		pid_t pid = fork();
 		if (pid == -1)
 		{
 			std::cerr << "fork()\n  " << strerror(errno) << std::endl;
-			return false;
+			return -1;
 		}
 
 		if (pid == 0)
@@ -53,10 +53,7 @@ namespace bsbar
 			exit(1);
 		}
 
-		if (block)
-			waitpid(pid, NULL, 0);
-
-		return true;
+		return pid;
 	}
 
 	static std::unordered_map<int, Block*> s_signals;
@@ -170,9 +167,6 @@ namespace bsbar
 		{
 			auto tp = time_point::clock::now();
 
-			// allow finished child processes to be freed
-			while (waitpid(-1, NULL, WNOHANG) > 0);
-
 			if (custom_update(tp))
 			{
 				std::scoped_lock _(m_mutex);
@@ -281,7 +275,28 @@ namespace bsbar
 		}
 
 		if (!m_on_click.command.empty())
-			exec(m_on_click.command, m_on_click.blocking);
+		{
+			if (!m_on_click.is_running || !m_on_click.single_instance)
+			{
+				pid_t pid = execute_command(m_on_click.command);
+
+				if (pid == -1)
+					return false;
+
+				std::scoped_lock _(m_mutex);
+				if (m_on_click.blocking)
+					waitpid(pid, NULL, 0);
+				else
+				{
+					m_on_click.is_running = true;
+					std::thread temp = std::thread([this, pid]() {
+						waitpid(pid, NULL, 0);
+						m_on_click.is_running = false;
+					});
+					temp.detach();
+				}
+			}
+		}
 
 		return true;
 	}
@@ -443,6 +458,11 @@ namespace bsbar
 				{
 					BSBAR_VERIFY_TYPE(value, boolean, key);
 					m_on_click.blocking = **value.as_boolean();
+				}
+				else if (key == "single-instance")
+				{
+					BSBAR_VERIFY_TYPE(value, boolean, key);
+					m_on_click.single_instance = **value.as_boolean();
 				}
 				else if (key == "slider-show")
 				{
