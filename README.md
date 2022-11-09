@@ -2,13 +2,13 @@
 
 Status generator for i3bar. I didn't like i3status, so I decided to build by own :D
 
-### Building
+## Building
 
-#### Dependencies
+### Dependencies
 
 You will only need to install *premake5* and *pulseaudio* development packages. Other dependencies are [*tomlplusplus*](https://github.com/marzer/tomlplusplus) and [*nlohmann::json*](https://github.com/nlohmann/json) which are included in this repo as header only libraries.
 
-#### Building
+### Building
 
 	git clone https://github.com/bananymous/bsbar
 	cd bsbar
@@ -17,22 +17,27 @@ You will only need to install *premake5* and *pulseaudio* development packages. 
 
 The binary can be found in `bin/Release/bsbar`
 
-### Configuration
+<br>
+
+## Configuration
 
 Config file can be stored in `$HOME/.config/bsbar/config.toml` or it can be specified as an argument to bsbar.
 
-Config file formatted using [toml](https://toml.io/en/).
+Config file is formatted using [toml](https://toml.io/en/).
 
-Config in [config/config.toml](/config/config.toml) now now server as reference until I get to make full default configuration.
+Config in [config/config.toml](/config/config.toml) can be used as a reference until I get to make full default configuration.
 
-#### Global configurations
+<br>
+
+### Global configurations
 
 | Key		| Accepts			| Default			| Description										|
 |-----------|-------------------|-------------------|---------------------------------------------------|
 | `order`	| list of strings	| *required*		| Defines the order of blocks from left to right.	|
 
+<br>
 
-#### Configurations that apply for every block
+### Configurations that apply to every block
 
 | Key			| Accepts			| Default			| Description																		|
 |---------------|-------------------|-------------------|-----------------------------------------------------------------------------------|
@@ -48,11 +53,11 @@ Config in [config/config.toml](/config/config.toml) now now server as reference 
 | `color`		| string			| none (white)		| Set the text color on this block. See format in i3bar protocol, linked below.		|
 |+ every key described in [i3bar protocol](https://i3wm.org/docs/i3bar-protocol.html).||||
 
+<br>
 
+### Click events
 
-#### Click events
-
-Click command can be defined in config in two different ways
+Click properties can be defined in two different ways
 
 	[block]
 	type = "..."
@@ -74,9 +79,9 @@ or
 | `blocking` 		| boolean	| false		| Should the click-handling-thread block until the `command` is finished. (no idea when this would be needed)	|
 | `single-instance` | boolean	| false		| Is there only allowed to be single instance of the `command` running.											|
 
+<br>
 
-
-#### Configuration of 'Battery' block
+### Configuration of 'Battery' block
 
 	type = "internal/battery"
 
@@ -87,9 +92,9 @@ Block's value is set to battery percentage (0 - 100).
 | `battery`			| string			| *"BAT0"*	| Which battery to use. Battery is searched from <code>/sys/class/power_supply/*battery*/</code>	|
 | `ramp-charging`	| list of strings	| none		| Alternative `ramp` used when the battery is charging.												|
 
+<br>
 
-
-#### Configuration of 'Custom' block
+### Configuration of 'Custom' block
 
 	type = "custom"
 
@@ -98,17 +103,17 @@ Block's value is set to battery percentage (0 - 100).
 | `text-command`	| string	| none		| Command whose output is replaces ```%text%``` in *format*.|
 | `value-command`	| string	| none		| Command whose output will be assigned to block's value.	|
 
+<br>
 
-
-#### Configuration of 'DateTime' block
+### Configuration of 'DateTime' block
 
 	type = "internal/datetime"
 
 Does not have any custom keys. `format` uses <code>[std::strftime](https://en.cppreference.com/w/c/chrono/strftime)</code> formatting.
 
+<br>
 
-
-#### Configuration of 'Menu' block
+### Configuration of 'Menu' block
 
 	type = "internal/menu"
 
@@ -121,11 +126,9 @@ Sub-blocks are defined in the config as <code>[*menu-block-name*.sub*n*]</code> 
 | `show-default`	| boolean	| false		| Are blocks in the menu are shown on startup.					|
 | `timeout`			| integer	| 0			| Number of seconds the menu stays open. 0 disables timeout.	|
 
+<br>
 
-
-
-
-#### Configuration of 'Network' block
+### Configuration of 'Network' block
 
 	type = "internal/network"
 
@@ -137,10 +140,9 @@ Sub-blocks are defined in the config as <code>[*menu-block-name*.sub*n*]</code> 
 | `format-disconnected`	| string	| none				| Alternative `format` that is used when the interface is not connected.		|
 | `color-auto`			| boolean	| false				| Is block's `color` automatically mapped from rssi (-100 - 0 => red - green).	|
 
+<br>
 
-
-
-#### Configuration of 'PulseAudio' block
+### Configuration of 'PulseAudio' block
 
 	type = "internal/pulseaudio.output"
 	type = "internal/pulseaudio.input"
@@ -159,11 +161,9 @@ Block's value is set to current volume.
 | `global-volume-cap`	| boolean	| true		| *(output only)* Should bsbar also limit volume set by other programs.							|
 | `enable-scroll`		| boolean	| true		| *(output only)* Does scrolling the mouse wheel while hovering this block modify sink volume.	|
 
+<br>
 
-
-
-
-#### Configuration of 'Temperature' block
+### Configuration of 'Temperature' block
 
 	type = "internal/temperature"
 
