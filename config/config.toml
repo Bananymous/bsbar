@@ -83,20 +83,20 @@ timeout = 10
 [powermenu.sub1]
 type = "custom"
 format = ""
-click-command = "shutdown now"
+click.command = "shutdown now"
 
 [powermenu.sub2]
 type = "custom"
 format = ""
-click-command = "reboot"
+click.command = "reboot"
 
 [powermenu.sub3]
 type = "custom"
 format = "鈴"
-click-command = "systemctl suspend"
+click.command = "systemctl suspend"
 
 [powermenu.sub4]
 type = "custom"
 format = ""
-click-command = "i3lock -c 000000"
+click.command = "i3lock -c 000000"
 
