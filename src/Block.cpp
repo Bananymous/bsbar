@@ -390,11 +390,6 @@ namespace bsbar
 			BSBAR_VERIFY_TYPE(value, boolean, key);
 			m_is_needed = **value.as_boolean();
 		}
-		else if (key == "click-command")
-		{
-			BSBAR_VERIFY_TYPE(value, string, key);
-			m_on_click.command = **value.as_string();
-		}
 		else if (key == "ramp")
 		{
 			BSBAR_VERIFY_TYPE_CUSTOM_MESSAGE(value, array, "value for key 'ramp' must be an array of strings");
