@@ -26,8 +26,6 @@
 		exit(1);																						\
 	}
 
-void print_blocks();
-
 namespace bsbar
 {
 
@@ -189,13 +187,14 @@ namespace bsbar
 					m_i3bar["color"] = { .is_string = true, .value = *m_color };
 			}
 
-			if (m_print)
-				print_blocks();
-			m_print		= false;
-			m_update	= false;
+			{
+				std::scoped_lock _(m_mutex);
+				m_last_update = tp;
+				m_wait_cv.notify_all();
+			}
 
 			std::unique_lock lock(m_mutex);
-			m_update_cv.wait(lock, [this]() { return m_update.load(); });
+			m_update_cv.wait(lock, [this]() { return m_request_update > m_last_update; });
 		}
 	}
 
@@ -204,19 +203,34 @@ namespace bsbar
 		return m_signals.find(sig) != m_signals.end();
 	}
 
-	void Block::update_clock_tick()
+	void Block::update_clock_tick(time_point tp)
 	{
 		custom_tick();
 		if (m_update_counter++ % m_interval)
 			return;
-		request_update(false);
+		request_update(false, tp);
 	}
 
-	void Block::request_update(bool print)
+	void Block::request_update(bool should_block, time_point tp)
 	{
-		m_update = true;
-		m_print = m_print | print;
+		m_request_update = tp;
 		m_update_cv.notify_all();
+
+		if (should_block)
+			block_until_updated(tp);
+	}
+
+	void Block::wait_if_needed(time_point tp) const
+	{
+		if (!m_is_needed)
+			return;
+		block_until_updated(tp);
+	}
+
+	void Block::block_until_updated(time_point tp) const
+	{
+		std::unique_lock lock(m_mutex);
+		m_wait_cv.wait(lock, [&]() { return m_last_update >= tp; });
 	}
 
 	void Block::print() const
@@ -355,6 +369,11 @@ namespace bsbar
 		{
 			BSBAR_VERIFY_TYPE(value, string, key);
 			m_format = **value.as_string();
+		}
+		else if (key == "needed")
+		{
+			BSBAR_VERIFY_TYPE(value, boolean, key);
+			m_is_needed = **value.as_boolean();
 		}
 		else if (key == "click-command")
 		{

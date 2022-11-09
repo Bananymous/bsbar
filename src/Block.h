@@ -44,8 +44,10 @@ namespace bsbar
 		const std::string& get_name() const		{ return m_type; }
 		const std::string& get_instance() const	{ return m_name; }
 
-		void update_clock_tick();
-		void request_update(bool print = false);
+		void update_clock_tick(time_point tp);
+		void request_update(bool should_block, time_point tp = time_point::clock::now());
+		void wait_if_needed(time_point tp) const;
+		void block_until_updated(time_point tp) const;
 
 		bool handles_signal(int signal) const;
 
@@ -115,9 +117,12 @@ namespace bsbar
 		} m_on_slider_click;
 		std::atomic<bool>							m_show_slider = false;
 
-		std::atomic<bool>							m_print		= false;
-		std::atomic<bool>							m_update	= false;
+		std::atomic<bool>							m_is_needed			= false;
+		time_point									m_last_update		= time_point::clock::now();
+		time_point									m_request_update	= time_point::clock::now();
+		mutable std::condition_variable				m_wait_cv;
 		std::condition_variable						m_update_cv;
+
 		std::thread 								m_thread;
 		mutable std::mutex							m_mutex;
 	};

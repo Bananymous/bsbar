@@ -87,6 +87,7 @@ static void signal_handler(int signal)
 	for (auto& block : s_blocks)
 		if (block->handles_signal(signal))
 			block->request_update(true);
+	print_blocks();
 }
 
 static void handle_clicks()
@@ -148,6 +149,8 @@ static void handle_clicks()
 				break;
 			}
 		}
+
+		print_blocks();
 	}
 }
 
@@ -174,19 +177,21 @@ int main(int argc, char** argv, char** env)
 
 	std::printf("{\"version\":1,\"click_events\":true}\n[\n");
 
+	using time_point = bsbar::Block::time_point;
+
+	time_point tp = time_point::clock::now();
 	while (true)
 	{
-		using namespace std::chrono;
+		for (auto& block : s_blocks)
+			block->update_clock_tick(tp);
 
 		for (auto& block : s_blocks)
-			block->update_clock_tick();
+			block->wait_if_needed(tp);
 
-		// FIXME: hacky way to wait for updates :D
-		std::this_thread::sleep_for(milliseconds(10));
 		print_blocks();
 
-		auto tp = system_clock::now();
-		tp = ceil<seconds>(tp);
+		tp = time_point::clock::now();
+		tp = ceil<std::chrono::seconds>(tp);
 		std::this_thread::sleep_until(tp);
 	}
 	
