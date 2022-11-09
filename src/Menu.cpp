@@ -10,13 +10,19 @@ namespace bsbar
 
 	void MenuBlock::custom_initialize()
 	{
+		std::sort(m_submenus.begin(), m_submenus.end(), [](const auto& a, const auto& b) { return a->get_instance() < b->get_instance(); });
 		for (auto& submenu : m_submenus)
 			submenu->initialize();
 	}
 
-	void MenuBlock::custom_config_done()
+	void MenuBlock::custom_tick()
 	{
-		std::sort(m_submenus.begin(), m_submenus.end(), [](const auto& a, const auto& b) { return a->get_instance() < b->get_instance(); });
+		if (!m_show_submenus)
+			return;
+		if (++m_timeout_ticks % m_timeout)
+			return;
+		m_show_submenus = false;
+		m_timeout_ticks = 0;
 	}
 
 	bool MenuBlock::custom_is_valid() const
@@ -29,11 +35,10 @@ namespace bsbar
 
 	bool MenuBlock::custom_update(time_point tp)
 	{
-		for (auto& submenu : m_submenus)
-			;
-
 		std::scoped_lock _(m_mutex);
 		m_text = m_format;
+		for (auto& submenu : m_submenus)
+			submenu->m_i3bar["separator"] = { .is_string = false, .value = "false" };
 		return true;
 	}
 
@@ -80,6 +85,23 @@ namespace bsbar
 		{
 			BSBAR_VERIFY_TYPE(value, boolean, key);
 			m_show_submenus = **value.as_boolean();
+			return true;
+		}
+
+		if (key == "timeout")
+		{
+			BSBAR_VERIFY_TYPE(value, integer, key);
+			int64_t timeout = **value.as_integer();
+			if (timeout == 0)
+				m_timeout = UINT64_MAX;
+			else if (timeout > 0)
+				m_timeout = timeout;
+			else
+			{
+				std::cerr << "Value for key 'timeout' must be positive integer or 0 to disable timeout" << std::endl;
+				std::cerr << "  " << value.source() << std::endl;
+				exit(1);
+			}
 			return true;
 		}
 

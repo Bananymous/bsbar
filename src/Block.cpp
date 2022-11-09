@@ -11,12 +11,13 @@
 #include "Temperature.h"
 
 #include <csignal>
+#include <fcntl.h>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
-#include <unordered_set>
-
+#include <sys/wait.h>
 #include <unistd.h>
+#include <unordered_set>
 
 #define BSBAR_VERIFY_SIGNAL(node)																		\
 	if (auto sig = **node.as_integer(); sig < 0 || sig > SIGRTMAX - SIGRTMIN) {							\
@@ -29,6 +30,36 @@ void print_blocks();
 
 namespace bsbar
 {
+
+	// If block is false, the child process is left as a zombie
+	static bool exec(const std::string& command, bool block)
+	{
+		pid_t pid = fork();
+		if (pid == -1)
+		{
+			std::cerr << "fork()\n  " << strerror(errno) << std::endl;
+			return false;
+		}
+
+		if (pid == 0)
+		{
+			if (int fd = open("/dev/null", O_WRONLY); fd != -1)
+			{
+				dup2(fd, STDOUT_FILENO);
+				close(fd);
+			}
+
+			execl("/bin/sh", "sh", command.c_str(), (char*)NULL);
+
+			std::cerr << "execl()\n  " << strerror(errno) << std::endl;
+			exit(1);
+		}
+
+		if (block)
+			waitpid(pid, NULL, 0);
+
+		return true;
+	}
 
 	static std::unordered_map<int, Block*> s_signals;
 
@@ -136,12 +167,13 @@ namespace bsbar
 	}
 
 	void Block::update_thread()
-	{
-		using namespace std::chrono;
-		
+	{		
 		while (true)
 		{
-			auto tp = system_clock::now();
+			auto tp = time_point::clock::now();
+
+			// allow finished child processes to be freed
+			while (waitpid(-1, NULL, WNOHANG) > 0);
 
 			if (custom_update(tp))
 			{
@@ -174,6 +206,7 @@ namespace bsbar
 
 	void Block::update_clock_tick()
 	{
+		custom_tick();
 		if (m_update_counter++ % m_interval)
 			return;
 		request_update(false);
@@ -234,13 +267,7 @@ namespace bsbar
 		}
 
 		if (!m_on_click.command.empty())
-		{
-			if (fork() == 0)
-			{
-				close(STDOUT_FILENO);
-				execl("/bin/sh", "sh", "-c", m_on_click.command.c_str(), NULL);
-			}
-		}
+			exec(m_on_click.command, m_on_click.blocking);
 
 		return true;
 	}
@@ -283,17 +310,16 @@ namespace bsbar
 		{
 			BSBAR_VERIFY_TYPE(value, integer, key);
 			int64_t interval = **value.as_integer();
-			if (interval == -1)
-				m_interval = INT64_MAX;
+			if (interval == 0)
+				m_interval = UINT64_MAX;
 			else if (interval > 0)
 				m_interval = interval;
 			else
 			{
-				std::cerr << "Value for key 'interval' must be positive integer or -1 to disable automatic updates" << std::endl;
+				std::cerr << "Value for key 'interval' must be positive integer or 0 to disable automatic updates" << std::endl;
 				std::cerr << "  " << value.source() << std::endl;
 				exit(1);
 			}
-			m_interval = **value.as_integer();
 		}
 		else if (key == "color")
 		{
@@ -392,7 +418,12 @@ namespace bsbar
 				if (key == "command")
 				{
 					BSBAR_VERIFY_TYPE(value, string, key);
-					m_on_click.command = '"' + **value.as_string() + '"';
+					m_on_click.command = **value.as_string();
+				}
+				else if (key == "blocking")
+				{
+					BSBAR_VERIFY_TYPE(value, boolean, key);
+					m_on_click.blocking = **value.as_boolean();
 				}
 				else if (key == "slider-show")
 				{

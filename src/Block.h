@@ -58,6 +58,8 @@ namespace bsbar
 	protected:
 		virtual void custom_initialize() {};
 
+		virtual void custom_tick() {};
+
 		virtual bool custom_is_valid() const { return true; }
 		virtual void custom_config_done() {}
 
@@ -80,11 +82,13 @@ namespace bsbar
 
 		std::optional<std::string>					m_color;
 
-		std::atomic<int64_t>						m_interval			= 1;
-		std::atomic<int64_t>						m_update_counter	= 0;
+		std::atomic<uint64_t>						m_interval			= 1;
+		std::atomic<uint64_t>						m_update_counter	= 0;
 
+	public:
 		std::unordered_map<std::string, Value>		m_i3bar;
 
+	protected:
 		std::string									m_text;
 
 		std::unordered_set<int>						m_signals;
@@ -102,6 +106,7 @@ namespace bsbar
 		struct
 		{
 			std::string		command;
+			bool			blocking = false;
 			SliderOptions	slider_options;
 		} m_on_click;
 		struct
