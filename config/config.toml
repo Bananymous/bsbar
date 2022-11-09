@@ -1,0 +1,102 @@
+order = [
+	"wireless",
+	"ethernet1",
+	"ethernet2",
+	"battery",
+	"temperature",
+	"volume",
+	"microphone",
+	"time",
+	"date",
+	"powermenu",
+]
+
+[wireless]
+type = "internal/network"
+format = "直 %ipv4%"
+format-disconnected = "睊"
+color-auto = true
+interface = "wlan0"
+click.command = "$HOME/.local/bin/bwm"
+click.single-instance = true
+
+[ethernet1]
+type = "internal/network"
+format = " %ipv4%"
+format-disconnected = ""
+interface = "enp5s0f3u2c4i2"
+color = "#00ff00"
+
+[ethernet2]
+type = "internal/network"
+format = " %ipv4%"
+format-disconnected = ""
+interface = "eno1"
+color = "#00ff00"
+
+[battery]
+type = "internal/battery"
+format = "%ramp% %value%%"
+ramp          = [ "", "", "", "", "", "", "", "", "", "", "" ]
+ramp-charging = [ "" ]
+interval = 5
+
+[temperature]
+type = "internal/temperature"
+format = " %value% °C"
+interval = 5
+
+[volume]
+type = "internal/pulseaudio.output"
+format = "%ramp% %value%%"
+format-muted = "婢 %value%%"
+color-muted = "#FFFF00"
+max-volume = 150
+min_width = "墳 100%"
+align = "center"
+ramp = [ "奄", "奔", "墳" ]
+signal = 1
+
+[microphone]
+type = "internal/pulseaudio.input"
+format = ""
+format-muted = ""
+color-muted = "#FFFF00"
+signal = 2
+
+[time]
+type = "internal/datetime"
+format = " %H:%M:%S"
+needed = true
+
+[date]
+type = "internal/datetime"
+format = " %d.%m.%Y"
+needed = true
+
+[powermenu]
+type = "internal/menu"
+format = "  "
+color = "#1793D1"
+timeout = 10
+
+[powermenu.sub1]
+type = "custom"
+format = ""
+click-command = "shutdown now"
+
+[powermenu.sub2]
+type = "custom"
+format = ""
+click-command = "reboot"
+
+[powermenu.sub3]
+type = "custom"
+format = "鈴"
+click-command = "systemctl suspend"
+
+[powermenu.sub4]
+type = "custom"
+format = ""
+click-command = "i3lock -c 000000"
+
