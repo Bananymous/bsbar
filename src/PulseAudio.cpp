@@ -26,7 +26,7 @@ namespace bsbar
 	{
 		pa_cvolume				volume	= {};
 		bool					muted	= false;
-		uint32_t				index	= 0;
+		uint32_t				index	= -1;
 
 		bool					updated	= false;
 		std::mutex				mutex;
@@ -37,6 +37,12 @@ namespace bsbar
 		{
 			updated = false;
 			cv.wait_for(lock, duration, [this]() { return updated; });
+		}
+
+		void wait_until_initialized()
+		{
+			std::unique_lock lock(mutex);
+			cv.wait(lock, [this]() { return index != -1; });
 		}
 
 		void update()
@@ -229,6 +235,7 @@ namespace bsbar
 	{
 		if (!pa_initialize())
 			exit(1);
+		s_sink_info.wait_until_initialized();
 	}
 
 	bool PulseAudioBlock::add_custom_config(std::string_view key, toml::node& value)
@@ -372,6 +379,7 @@ namespace bsbar
 	{
 		if (!pa_initialize())
 			exit(1);
+		s_source_info.wait_until_initialized();
 	}
 
 	bool PulseAudioInputBlock::add_custom_config(std::string_view key, toml::node& value)
