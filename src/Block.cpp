@@ -107,7 +107,7 @@ namespace bsbar
 			block = std::make_unique<MenuBlock>();
 		else if (*type == "internal/network")
 			block = std::make_unique<NetworkBlock>();
-		else if (*type == "internal/pulseaudio")
+		else if (*type == "internal/pulseaudio.output")
 			block = std::make_unique<PulseAudioBlock>();
 		else if (*type == "internal/pulseaudio.input")
 			block = std::make_unique<PulseAudioInputBlock>();
@@ -409,12 +409,18 @@ namespace bsbar
 		else if (key == "value-min")
 		{
 			BSBAR_VERIFY_TYPE(value, number, key);
-			m_value.min = **value.as_floating_point();
+			if (value.is_integer())
+				m_value.min = **value.as_integer();
+			else
+				m_value.min = **value.as_floating_point();
 		}
 		else if (key == "value-max")
 		{
 			BSBAR_VERIFY_TYPE(value, number, key);
-			m_value.max = **value.as_floating_point();
+			if (value.is_integer())
+				m_value.min = **value.as_integer();
+			else
+				m_value.max = **value.as_floating_point();
 		}
 		else if (key == "precision")
 		{
