@@ -23,6 +23,14 @@ Config file can be stored in `$HOME/.config/bsbar/config.toml` or it can be spec
 
 Config file formatted using [toml](https://toml.io/en/).
 
+Config in [config/config.toml](/config/config.toml) now now server as reference until I get to make full default configuration.
+
+#### Global configurations
+
+| Key		| Accepts			| Default			| Description										|
+|-----------|-------------------|-------------------|---------------------------------------------------|
+| `order`	| list of strings	| *required*		| Defines the order of blocks from left to right.	|
+
 
 #### Configurations that apply for every block
 
