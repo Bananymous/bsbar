@@ -49,7 +49,7 @@ namespace bsbar
 				close(fd);
 			}
 
-			execl("/bin/sh", "sh", command.c_str(), (char*)NULL);
+			execl("/bin/sh", "sh", "-c", command.c_str(), (char*)NULL);
 
 			std::cerr << "execl()\n  " << strerror(errno) << std::endl;
 			exit(1);
