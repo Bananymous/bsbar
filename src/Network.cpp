@@ -2,6 +2,7 @@
 
 #include "Common.h"
 
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 
@@ -117,7 +118,11 @@ namespace bsbar
 				int b = 0;
 
 				std::stringstream ss;
-				ss << std::hex << '#' << r << g << b;
+				ss << std::hex << std::setfill('0');
+				ss << '#';
+				ss << std::setw(2) << r;
+				ss << std::setw(2) << g;
+				ss << std::setw(2) << b;
 				color = ss.str();
 			}
 		}
